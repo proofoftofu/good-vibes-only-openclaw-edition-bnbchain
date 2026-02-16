@@ -1,0 +1,9 @@
+{
+  "chain": "bscTestnet",
+  "deployedAt": "2026-02-16T23:37:17.713Z",
+  "contracts": {
+    "AgentRegistry": "0x670b33d234F88D091ADd832b1835C030f255a9b0",
+    "ArenaRegistry": "0x91Af2c34B4e9263C4b067b97E718D81Cf7D434F9",
+    "DungeonStateCommit": "0xc9513F3efBB60846f7b8D2d873eb5c58c4296Dea"
+  }
+}

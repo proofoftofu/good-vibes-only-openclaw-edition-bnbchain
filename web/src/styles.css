@@ -1,0 +1,116 @@
+:root {
+  color-scheme: only light;
+  font-family: "Space Grotesk", "Avenir Next", "Segoe UI", sans-serif;
+  background: radial-gradient(circle at 20% 10%, #134e4a, #0b132b 45%, #020617 80%);
+  color: #f8fafc;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+}
+
+main {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  gap: 16px;
+}
+
+.topbar h1 {
+  margin: 0;
+  font-size: clamp(1.4rem, 2.5vw, 2rem);
+}
+
+.topbar p {
+  margin: 6px 0 0;
+  color: #bae6fd;
+}
+
+.wallet-box {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 16px;
+}
+
+.game-canvas canvas {
+  width: 100%;
+  height: auto;
+  border-radius: 12px;
+  border: 1px solid #94a3b8;
+}
+
+.panel {
+  background: rgba(15, 23, 42, 0.8);
+  border: 1px solid #475569;
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.panel h2 {
+  margin-top: 0;
+}
+
+.panel ul {
+  padding-left: 18px;
+  margin-top: 0;
+}
+
+.subtle {
+  color: #bae6fd;
+}
+
+.status {
+  min-height: 40px;
+  font-size: 0.95rem;
+  color: #e2e8f0;
+}
+
+.tx-hash code {
+  font-size: 0.75rem;
+  word-break: break-all;
+}
+
+button {
+  border: 0;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: linear-gradient(120deg, #06b6d4, #22c55e);
+  color: #03222f;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.panel button {
+  display: block;
+  width: 100%;
+  margin-bottom: 10px;
+}
+
+@media (max-width: 960px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+
+  .topbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

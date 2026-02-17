@@ -58,6 +58,11 @@ export default function App() {
     return () => ws.close();
   }, []);
 
+  useEffect(() => {
+    setRunNonce(1);
+    setStatus("Run auto-started. Keep climbing.");
+  }, []);
+
   const onCommit = async () => {
     const previousVersion = arena.versionId;
     setStatus("Submitting mutation transaction...");
@@ -82,7 +87,7 @@ export default function App() {
       <header className="topbar">
         <div>
           <h1>Relic Run: Dungeon Under Rewrite</h1>
-          <p>Onchain DM commits that visibly mutate live dungeon phases.</p>
+          <p>Onchain DM commits mutate a 3D survival arena in real time.</p>
         </div>
         <div className="wallet-box">
           {isConnected ? (
@@ -116,7 +121,7 @@ export default function App() {
           latestTxHash={latestTxHash}
           onStartRun={() => {
             setRunNonce((v) => v + 1);
-            setStatus("Run started. Use WASD/arrows to move, Space to jump, Shift to dash.");
+            setStatus("Run recentered. Keep climbing.");
           }}
           onCommit={onCommit}
         />

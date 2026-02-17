@@ -23,7 +23,7 @@ export function ControlPanel(props: Props) {
         <li>Loot Multiplier: {props.lootMultiplier.toFixed(2)}x</li>
         <li>Patched Tiles: {props.patchTiles}</li>
       </ul>
-      <button onClick={props.onStartRun}>Start Run</button>
+      <button onClick={props.onStartRun}>Recenter Run</button>
       <button onClick={() => void props.onCommit()}>Commit Next Mutation</button>
       <p className="status">{props.status}</p>
       {props.latestTxHash ? (

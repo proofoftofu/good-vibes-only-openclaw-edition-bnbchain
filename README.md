@@ -43,13 +43,19 @@ Implements requested interface:
 - `announce_change(arenaId, message)`
 
 ### Web client (`web/`)
-- React HUD + Three.js 3D platformer arena with single-player extraction loop.
-- Mechanics: jump/platform traversal, moving sentinel hazards, relic collection, dash, extraction goal.
+- React HUD + Three.js 3D survival arena inspired by elimination party games.
+- Mechanics: complex multi-level map, moving platforms, sweepers, bumpers, falling blocks, jump + dash movement.
+- Physics-first elimination: no HP system; collisions apply knockback and players are eliminated when they fall off-map.
+- Chaos pacing inspired by `chaos-arena-public`:
+  - timed arena shrink events
+  - periodic hazard-wave spawns
+  - low-gravity trick windows
+- Objective: survive as long as possible; no relic collection and no finish goal.
 - On-chain state impact:
-  - `SET_HAZARD_RATE` -> hazard pressure and spawn target
-  - `SET_ENEMY_SPEED` -> hunter movement speed
-  - `SET_LOOT_MULTIPLIER` -> shard score value
-  - `PATCH_TILES` -> blocked/hazard tile overlays in map
+  - `SET_HAZARD_RATE` -> arena danger pressure and obstacle damage
+  - `SET_ENEMY_SPEED` -> sweeper/bumper motion speed
+  - `SET_LOOT_MULTIPLIER` -> survival score scaling
+  - `PATCH_TILES` -> extra trap objects/distractions mapped into arena
 - Wallet connection via wagmi/viem.
 - Admin action button for committing next DM mutation.
 - Real-time mutation updates over websocket (tx hash and new versioned state).
@@ -103,9 +109,9 @@ npm run dev --workspace web
 1. Deploy contracts and set `DUNGEON_COMMIT_ADDRESS`.
 2. Run bootstrap script and set `VITE_ARENA_ID`.
 3. Open web app and connect wallet on BSC testnet.
-4. Click `Start Run`, then move with `WASD/Arrow`, jump with `Space`, dash with `Shift`, and reach the goal.
+4. Click `Start Run`, then move with `WASD/Arrow`, jump with `Space`, dash with `Shift`.
 5. Click `Commit Next Mutation` during a run.
-6. Observe versioned on-chain mutation visibly changing pressure, speed, loot value, or patched tiles.
+6. Observe versioned on-chain mutation changing obstacle speed, danger pressure, and map distractions.
 
 ## Scope Notes (MVP)
 - Single game mode (`Dungeon Sprint`) with one arena template.

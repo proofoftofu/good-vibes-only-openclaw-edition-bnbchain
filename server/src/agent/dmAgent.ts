@@ -32,32 +32,47 @@ export class DmAgentService {
   }
 
   propose_mutation(context: ArenaContext): { payload: MutationPayload; rationale: string } {
-    const phase = context.currentVersion % 4;
+    const phase = context.currentVersion % 6;
+    const pressure = Math.min(100, 35 + context.currentVersion * 4);
 
     if (phase === 0) {
       return {
-        payload: { mutationType: "SET_HAZARD_RATE", hazardRate: 35 },
-        rationale: "Open with moderate pressure so players can still route to relic zones."
+        payload: { mutationType: "SET_HAZARD_RATE", hazardRate: Math.min(88, pressure) },
+        rationale: "Escalate arena pressure to force movement and deny safe camping."
       };
     }
 
     if (phase === 1) {
       return {
-        payload: { mutationType: "SET_ENEMY_SPEED", enemySpeed: 1.2 },
-        rationale: "Increase chase intensity entering Pressure phase."
+        payload: { mutationType: "SET_ENEMY_SPEED", enemySpeed: Math.min(2.3, 1 + context.currentVersion * 0.08) },
+        rationale: "Increase obstacle speed for survival-chaos pacing."
       };
     }
 
     if (phase === 2) {
       return {
-        payload: { mutationType: "SET_LOOT_MULTIPLIER", lootMultiplier: 1.4 },
-        rationale: "Offer risk-reward before collapse to keep runs tense."
+        payload: { mutationType: "PATCH_TILES", x: 5 + (context.currentVersion % 8), y: 3 + (context.currentVersion % 10), tileState: "HAZARD" },
+        rationale: "Inject a new trap lane to reshape safe routes."
+      };
+    }
+
+    if (phase === 3) {
+      return {
+        payload: { mutationType: "PATCH_TILES", x: 2 + (context.currentVersion % 16), y: 2 + ((context.currentVersion * 3) % 15), tileState: "BLOCKED" },
+        rationale: "Block a previously reliable lane and force adaptive movement."
+      };
+    }
+
+    if (phase === 4) {
+      return {
+        payload: { mutationType: "SET_HAZARD_RATE", hazardRate: Math.min(96, pressure + 8) },
+        rationale: "Trigger hazard-wave conditions for a mid-run intensity spike."
       };
     }
 
     return {
-      payload: { mutationType: "PATCH_TILES", x: 10, y: 6, tileState: "HAZARD" },
-      rationale: "Force pathing adaptation near extraction corridor."
+      payload: { mutationType: "SET_LOOT_MULTIPLIER", lootMultiplier: Math.min(3, 1.2 + context.currentVersion * 0.05) },
+      rationale: "Scale score multiplier with risk so longer survival remains rewarding."
     };
   }
 

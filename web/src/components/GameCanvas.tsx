@@ -10,24 +10,6 @@ interface Props {
   runNonce: number;
 }
 
-type Platform = {
-  mesh: any;
-  size: any;
-};
-
-type Hazard = {
-  mesh: any;
-  base: any;
-  axis: "x" | "z";
-  range: number;
-  phase: number;
-};
-
-type Orb = {
-  mesh: any;
-  taken: boolean;
-};
-
 type ArenaState = {
   versionId: number;
   hazardRate: number;
@@ -36,21 +18,61 @@ type ArenaState = {
   tiles: [string, string][];
 };
 
+type Platform = {
+  mesh: any;
+  size: any;
+  driftAxis: "x" | "z";
+  driftSpeed: number;
+  driftAmp: number;
+  driftPhase: number;
+  baseX: number;
+  baseZ: number;
+};
+
+type Bumper = {
+  mesh: any;
+  center: any;
+  radius: number;
+  speed: number;
+  phase: number;
+};
+
+type Rotor = {
+  pivot: any;
+  width: number;
+  height: number;
+  length: number;
+  speed: number;
+};
+
+type PatchCollider = {
+  mesh: any;
+  pos: any;
+  radius: number;
+};
+
+type PhysicsConfig = {
+  gravity: number;
+  collisionPush: number;
+  platformDriftScale: number;
+};
+
 type Hud = {
-  hp: number;
-  time: number;
-  orbs: number;
+  altitude: number;
+  bestAltitude: number;
   score: number;
   version: number;
+  gravity: number;
+  danger: number;
   message: string;
 };
 
-const WORLD_BOUNDS = {
-  minX: -12,
-  maxX: 18,
-  minZ: -8,
-  maxZ: 8
-};
+const PLAYER_RADIUS = 0.45;
+const PLAYER_HEIGHT = 1.8;
+const BASE_RADIUS = 13;
+const PLATFORM_COUNT = 34;
+const START_Y = 1.2;
+const FALL_DEATH_Y = -14;
 
 export function GameCanvas({ versionId, hazardRate, enemySpeed, lootMultiplier, tiles, runNonce }: Props) {
   const hostRef = useRef<HTMLDivElement | null>(null);
@@ -58,12 +80,13 @@ export function GameCanvas({ versionId, hazardRate, enemySpeed, lootMultiplier, 
   const runNonceRef = useRef(runNonce);
 
   const [hud, setHud] = useState<Hud>({
-    hp: 100,
-    time: 90,
-    orbs: 0,
+    altitude: 0,
+    bestAltitude: 0,
     score: 0,
     version: versionId,
-    message: "Press Start Run"
+    gravity: 28,
+    danger: hazardRate,
+    message: "World is live. Keep moving up."
   });
 
   useEffect(() => {
@@ -78,78 +101,65 @@ export function GameCanvas({ versionId, hazardRate, enemySpeed, lootMultiplier, 
     if (!hostRef.current) return;
 
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x070d1a);
-    scene.fog = new THREE.Fog(0x070d1a, 12, 45);
+    scene.background = new THREE.Color(0x050a14);
+    scene.fog = new THREE.Fog(0x050a14, 20, 150);
 
-    const camera = new THREE.PerspectiveCamera(62, 4 / 3, 0.1, 120);
+    const camera = new THREE.PerspectiveCamera(62, 4 / 3, 0.1, 300);
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     hostRef.current.appendChild(renderer.domElement);
 
-    const hemi = new THREE.HemisphereLight(0xbbe7ff, 0x223344, 1.05);
+    const hemi = new THREE.HemisphereLight(0xdbeafe, 0x1e293b, 0.95);
     scene.add(hemi);
 
-    const dir = new THREE.DirectionalLight(0xffffff, 1.2);
-    dir.position.set(10, 16, 8);
-    scene.add(dir);
+    const sun = new THREE.DirectionalLight(0xffffff, 1.2);
+    sun.position.set(14, 32, 12);
+    scene.add(sun);
 
     const skyRing = new THREE.Mesh(
-      new THREE.TorusGeometry(24, 0.18, 18, 120),
-      new THREE.MeshStandardMaterial({ color: 0x0ea5e9, emissive: 0x082f49, metalness: 0.2, roughness: 0.4 })
+      new THREE.TorusGeometry(46, 0.24, 20, 200),
+      new THREE.MeshStandardMaterial({ color: 0x38bdf8, emissive: 0x0c4a6e, roughness: 0.28 })
     );
     skyRing.rotation.x = Math.PI / 2;
-    skyRing.position.y = 12;
+    skyRing.position.y = 36;
     scene.add(skyRing);
 
-    const lava = new THREE.Mesh(
-      new THREE.PlaneGeometry(80, 80),
-      new THREE.MeshStandardMaterial({ color: 0xdc2626, emissive: 0x7f1d1d, metalness: 0.1, roughness: 0.8 })
+    const cloudLayer = new THREE.Group();
+    scene.add(cloudLayer);
+    for (let i = 0; i < 16; i += 1) {
+      const puff = new THREE.Mesh(
+        new THREE.SphereGeometry(1.2 + Math.random() * 1.5, 10, 10),
+        new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.8, transparent: true, opacity: 0.55 })
+      );
+      puff.position.set((Math.random() - 0.5) * 52, Math.random() * 50, (Math.random() - 0.5) * 52);
+      cloudLayer.add(puff);
+    }
+
+    const safetyDeck = new THREE.Mesh(
+      new THREE.CylinderGeometry(BASE_RADIUS + 2.5, BASE_RADIUS + 2.5, 0.8, 48),
+      new THREE.MeshStandardMaterial({ color: 0x1f2937, roughness: 0.9 })
     );
-    lava.rotation.x = -Math.PI / 2;
-    lava.position.y = -4;
-    scene.add(lava);
-
-    const platformMat = new THREE.MeshStandardMaterial({ color: 0x1d4ed8, roughness: 0.45, metalness: 0.2 });
-    const platformTopMat = new THREE.MeshStandardMaterial({ color: 0x38bdf8, roughness: 0.3, metalness: 0.15 });
-
-    const platforms: Platform[] = [];
-    const addPlatform = (x: number, y: number, z: number, w: number, h: number, d: number) => {
-      const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), [platformMat, platformMat, platformTopMat, platformMat, platformMat, platformMat]);
-      mesh.position.set(x, y, z);
-      scene.add(mesh);
-      platforms.push({ mesh, size: new THREE.Vector3(w, h, d) });
-    };
-
-    addPlatform(-8, 0, 0, 8, 1, 8);
-    addPlatform(-1.5, 1.5, 0, 5, 1, 5);
-    addPlatform(4.5, 3, -1.5, 5, 1, 5);
-    addPlatform(10.5, 4.5, 1.5, 5, 1, 5);
-    addPlatform(15, 6, 0, 6, 1, 6);
-
-    const goal = new THREE.Mesh(
-      new THREE.ConeGeometry(0.8, 2, 10),
-      new THREE.MeshStandardMaterial({ color: 0x22c55e, emissive: 0x14532d, roughness: 0.35 })
-    );
-    goal.position.set(15, 7.6, 0);
-    scene.add(goal);
+    safetyDeck.position.y = -6.2;
+    scene.add(safetyDeck);
 
     const player = new THREE.Group();
     const body = new THREE.Mesh(
-      new THREE.CapsuleGeometry(0.45, 0.9, 4, 8),
-      new THREE.MeshStandardMaterial({ color: 0xf8fafc, emissive: 0x1e293b, roughness: 0.3 })
+      new THREE.CapsuleGeometry(PLAYER_RADIUS, 0.95, 6, 12),
+      new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.28, emissive: 0x0f172a })
     );
     const visor = new THREE.Mesh(
-      new THREE.SphereGeometry(0.22, 12, 12),
-      new THREE.MeshStandardMaterial({ color: 0x38bdf8, emissive: 0x082f49, roughness: 0.2 })
+      new THREE.SphereGeometry(0.23, 14, 14),
+      new THREE.MeshStandardMaterial({ color: 0x22d3ee, emissive: 0x0e7490, roughness: 0.15 })
     );
-    visor.position.set(0, 0.35, 0.28);
+    visor.position.set(0, 0.35, 0.26);
     player.add(body);
     player.add(visor);
     scene.add(player);
 
-    const hazards: Hazard[] = [];
-    const orbs: Orb[] = [];
-    const patchHazards: any[] = [];
+    const platforms: Platform[] = [];
+    const bumpers: Bumper[] = [];
+    const rotors: Rotor[] = [];
+    const patchColliders: PatchCollider[] = [];
 
     const keys: Record<string, boolean> = {
       ArrowUp: false,
@@ -160,31 +170,42 @@ export function GameCanvas({ versionId, hazardRate, enemySpeed, lootMultiplier, 
       a: false,
       s: false,
       d: false,
-      " ": false,
-      Shift: false
+      Shift: false,
+      " ": false
     };
 
-    const velocity = new THREE.Vector3(0, 0, 0);
-    const moveDir = new THREE.Vector3(1, 0, 0);
+    const vel = new THREE.Vector3(0, 0, 0);
+    const moveDir = new THREE.Vector3(0, 0, -1);
 
-    let hp = 100;
+    let elapsed = 0;
+    let bestAltitude = 0;
     let score = 0;
-    let remaining = 90;
-    let orbCount = 0;
+    let notice = "World is live. Keep moving up.";
     let running = false;
+
     let grounded = false;
-    let invuln = 0;
-    let dashCooldown = 0;
+    let coyoteTime = 0;
+    let jumpBuffer = 0;
+    let jumpHold = 0;
+    let wasJumpDown = false;
+
     let dashBoost = 0;
+    let dashCooldown = 0;
+    let knockbackCooldown = 0;
+
+    let highestPlatformY = START_Y;
+    let currentVersion = arenaRef.current.versionId;
+    let seenRunNonce = runNonceRef.current;
+
+    let physics: PhysicsConfig = {
+      gravity: 28,
+      collisionPush: 6,
+      platformDriftScale: 1
+    };
+    let cameraPitch = 0.62;
+
     let lastTick = performance.now();
     let lastHudSync = 0;
-    let seenRunNonce = runNonceRef.current;
-    let notice = "Press Start Run";
-
-    const playerRadius = 0.45;
-    const playerHeight = 1.8;
-    const firstPlatformTop = 0.5;
-    const startPlayerY = firstPlatformTop + playerHeight / 2 + 0.08;
 
     const updateRendererSize = () => {
       if (!hostRef.current) return;
@@ -195,318 +216,472 @@ export function GameCanvas({ versionId, hazardRate, enemySpeed, lootMultiplier, 
       camera.updateProjectionMatrix();
     };
 
-    const clearArenaObjects = () => {
-      for (const h of hazards) scene.remove(h.mesh);
-      for (const o of orbs) scene.remove(o.mesh);
-      for (const p of patchHazards) scene.remove(p);
-      hazards.length = 0;
-      orbs.length = 0;
-      patchHazards.length = 0;
+    const setPhysicsFromChain = () => {
+      const s = arenaRef.current;
+      physics = {
+        gravity: THREE.MathUtils.clamp(18 + s.lootMultiplier * 9, 18, 42),
+        collisionPush: THREE.MathUtils.clamp(4.5 + s.hazardRate * 0.08, 4.5, 12),
+        platformDriftScale: THREE.MathUtils.clamp(0.65 + s.enemySpeed * 0.35 + s.hazardRate * 0.003, 0.65, 2.2)
+      };
     };
 
-    const rebuildArenaFromState = () => {
-      clearArenaObjects();
-      const arena = arenaRef.current;
+    const clearArena = () => {
+      for (const p of platforms) scene.remove(p.mesh);
+      for (const b of bumpers) scene.remove(b.mesh);
+      for (const r of rotors) scene.remove(r.pivot);
+      for (const c of patchColliders) scene.remove(c.mesh);
+      platforms.length = 0;
+      bumpers.length = 0;
+      rotors.length = 0;
+      patchColliders.length = 0;
+    };
 
-      const hazardCount = THREE.MathUtils.clamp(Math.round(arena.hazardRate / 12), 3, 12);
-      for (let i = 0; i < hazardCount; i += 1) {
-        const mesh = new THREE.Mesh(
-          new THREE.DodecahedronGeometry(0.45, 0),
-          new THREE.MeshStandardMaterial({ color: 0xfb7185, emissive: 0x7f1d1d, roughness: 0.25 })
-        );
-        const base = new THREE.Vector3(
-          THREE.MathUtils.randFloat(-6, 14),
-          THREE.MathUtils.randFloat(1.3, 6.6),
-          THREE.MathUtils.randFloat(-5, 5)
-        );
-        mesh.position.copy(base);
-        scene.add(mesh);
-        hazards.push({
-          mesh,
-          base,
-          axis: i % 2 === 0 ? "x" : "z",
-          range: THREE.MathUtils.randFloat(1.1, 3.4),
-          phase: i * 0.65
-        });
+    const createPlatform = (x: number, y: number, z: number, size: number, drift: boolean) => {
+      const mesh = new THREE.Mesh(
+        new THREE.BoxGeometry(size, 0.58, size),
+        new THREE.MeshStandardMaterial({ color: 0x1d4ed8, roughness: 0.38, metalness: 0.14 })
+      );
+      mesh.position.set(x, y, z);
+      scene.add(mesh);
+
+      const p: Platform = {
+        mesh,
+        size: new THREE.Vector3(size, 0.58, size),
+        driftAxis: Math.random() > 0.5 ? "x" : "z",
+        driftSpeed: drift ? THREE.MathUtils.lerp(0.5, 1.2, Math.random()) : 0,
+        driftAmp: drift ? THREE.MathUtils.lerp(0.35, 1.15, Math.random()) : 0,
+        driftPhase: Math.random() * Math.PI * 2,
+        baseX: x,
+        baseZ: z
+      };
+      platforms.push(p);
+      highestPlatformY = Math.max(highestPlatformY, y);
+      return p;
+    };
+
+    const createRotor = (x: number, y: number, z: number, length: number, speed: number) => {
+      const pivot = new THREE.Group();
+      pivot.position.set(x, y, z);
+      const bar = new THREE.Mesh(
+        new THREE.BoxGeometry(0.42, 0.3, length),
+        new THREE.MeshStandardMaterial({ color: 0xfb7185, roughness: 0.24, metalness: 0.16 })
+      );
+      pivot.add(bar);
+      scene.add(pivot);
+      rotors.push({ pivot, width: 0.42, height: 0.3, length, speed });
+    };
+
+    const createBumper = (x: number, y: number, z: number, radius: number, speed: number) => {
+      const mesh = new THREE.Mesh(
+        new THREE.SphereGeometry(0.63, 14, 14),
+        new THREE.MeshStandardMaterial({ color: 0xa78bfa, emissive: 0x5b21b6, roughness: 0.24 })
+      );
+      mesh.position.set(x, y, z);
+      scene.add(mesh);
+      bumpers.push({ mesh, center: mesh.position.clone(), radius, speed, phase: Math.random() * Math.PI * 2 });
+    };
+
+    const buildMap = () => {
+      clearArena();
+      setPhysicsFromChain();
+
+      highestPlatformY = START_Y;
+      const seed = currentVersion * 97 + Math.round(arenaRef.current.hazardRate * 13) + Math.round(arenaRef.current.enemySpeed * 29);
+      let s = seed || 1;
+      const rand = () => {
+        s = (s * 1664525 + 1013904223) % 4294967296;
+        return s / 4294967296;
+      };
+
+      let x = 0;
+      let y = START_Y;
+      let z = 0;
+      let angle = rand() * Math.PI * 2;
+
+      const start = createPlatform(x, y, z, 3.7, false);
+      player.position.set(start.mesh.position.x, start.mesh.position.y + start.size.y / 2 + PLAYER_HEIGHT / 2 + 0.05, start.mesh.position.z);
+
+      for (let i = 0; i < PLATFORM_COUNT; i += 1) {
+        const dist = THREE.MathUtils.lerp(2.6, 4.6, rand());
+        const rise = THREE.MathUtils.lerp(1.6, 2.8, rand());
+        angle += THREE.MathUtils.lerp(-1.05, 1.05, rand());
+
+        x += Math.cos(angle) * dist;
+        z += Math.sin(angle) * dist;
+        y += rise;
+
+        const radial = Math.hypot(x, z);
+        if (radial > BASE_RADIUS) {
+          const scale = BASE_RADIUS / radial;
+          x *= scale;
+          z *= scale;
+        }
+
+        const size = THREE.MathUtils.lerp(2.2, 3.2, rand());
+        const drift = rand() < 0.26;
+        createPlatform(x, y, z, size, drift);
+
+        if (rand() < 0.16) {
+          const sideA = angle + (rand() > 0.5 ? 1 : -1) * THREE.MathUtils.lerp(0.45, 1.1, rand());
+          createPlatform(
+            x + Math.cos(sideA) * THREE.MathUtils.lerp(1.9, 3.2, rand()),
+            y + THREE.MathUtils.lerp(-0.4, 0.65, rand()),
+            z + Math.sin(sideA) * THREE.MathUtils.lerp(1.9, 3.2, rand()),
+            THREE.MathUtils.lerp(1.9, 2.4, rand()),
+            rand() < 0.2
+          );
+        }
       }
 
-      const orbTotal = THREE.MathUtils.clamp(Math.round(4 + arena.lootMultiplier * 2), 4, 9);
-      for (let i = 0; i < orbTotal; i += 1) {
-        const mesh = new THREE.Mesh(
-          new THREE.IcosahedronGeometry(0.34, 0),
-          new THREE.MeshStandardMaterial({ color: 0xfacc15, emissive: 0x854d0e, roughness: 0.25 })
-        );
-        mesh.position.set(
-          THREE.MathUtils.randFloat(-8, 16),
-          THREE.MathUtils.randFloat(1.2, 7.2),
-          THREE.MathUtils.randFloat(-5.5, 5.5)
-        );
-        scene.add(mesh);
-        orbs.push({ mesh, taken: false });
+      const rotorCount = THREE.MathUtils.clamp(2 + Math.floor(arenaRef.current.enemySpeed), 2, 5);
+      for (let i = 0; i < rotorCount; i += 1) {
+        createRotor(0, THREE.MathUtils.lerp(4, highestPlatformY - 3, i / Math.max(1, rotorCount - 1)), 0, THREE.MathUtils.lerp(8, 12, rand()), THREE.MathUtils.lerp(0.55, 1.1, rand()) * (i % 2 === 0 ? 1 : -1));
       }
 
-      const tileEntries = arena.tiles.slice(0, 40);
-      for (const [key, state] of tileEntries) {
+      const bumperCount = THREE.MathUtils.clamp(Math.round(arenaRef.current.hazardRate / 23), 2, 7);
+      for (let i = 0; i < bumperCount; i += 1) {
+        const a = rand() * Math.PI * 2;
+        const r = THREE.MathUtils.lerp(2.2, BASE_RADIUS - 1.6, rand());
+        createBumper(Math.cos(a) * r, THREE.MathUtils.lerp(3, highestPlatformY - 1, rand()), Math.sin(a) * r, THREE.MathUtils.lerp(0.9, 1.8, rand()), THREE.MathUtils.lerp(0.45, 1.0, rand()));
+      }
+
+      for (const [key, value] of arenaRef.current.tiles.slice(0, 18)) {
         const [gxRaw, gyRaw] = key.split(":");
         const gx = Number(gxRaw);
         const gy = Number(gyRaw);
         if (!Number.isFinite(gx) || !Number.isFinite(gy)) continue;
 
-        const x = THREE.MathUtils.mapLinear(gx, 0, 19, -10, 16);
-        const z = THREE.MathUtils.mapLinear(gy, 0, 19, -6.5, 6.5);
-        const y = THREE.MathUtils.mapLinear((gx + gy) % 5, 0, 4, 0.7, 6.2);
+        const a = THREE.MathUtils.mapLinear(gx, 0, 19, 0, Math.PI * 2);
+        const r = THREE.MathUtils.mapLinear(gy, 0, 19, 2.1, BASE_RADIUS - 1.3);
+        const yPos = THREE.MathUtils.mapLinear((gx + gy) % 10, 0, 9, 4, highestPlatformY - 2);
 
-        if (state === "BLOCKED") {
-          const mesh = new THREE.Mesh(
-            new THREE.BoxGeometry(0.8, 1.5, 0.8),
-            new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.5 })
+        if (value === "HAZARD") {
+          const cone = new THREE.Mesh(
+            new THREE.ConeGeometry(0.45, 1.05, 8),
+            new THREE.MeshStandardMaterial({ color: 0xfb923c, emissive: 0x9a3412, roughness: 0.32 })
           );
-          mesh.position.set(x, y, z);
-          scene.add(mesh);
-          patchHazards.push(mesh);
-        } else if (state === "HAZARD") {
-          const mesh = new THREE.Mesh(
-            new THREE.ConeGeometry(0.45, 1.2, 8),
-            new THREE.MeshStandardMaterial({ color: 0xf97316, emissive: 0x9a3412, roughness: 0.3 })
+          cone.position.set(Math.cos(a) * r, yPos, Math.sin(a) * r);
+          scene.add(cone);
+          patchColliders.push({ mesh: cone, pos: cone.position.clone(), radius: 0.84 });
+        }
+
+        if (value === "BLOCKED") {
+          const box = new THREE.Mesh(
+            new THREE.BoxGeometry(1, 1.8, 1),
+            new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.44 })
           );
-          mesh.position.set(x, y, z);
-          scene.add(mesh);
-          patchHazards.push(mesh);
+          box.position.set(Math.cos(a) * r, yPos, Math.sin(a) * r);
+          scene.add(box);
+          patchColliders.push({ mesh: box, pos: box.position.clone(), radius: 0.86 });
         }
       }
 
-      notice = `On-chain v${arena.versionId}: hazards=${arena.hazardRate} enemy=${arena.enemySpeed.toFixed(2)} loot=${arena.lootMultiplier.toFixed(2)}`;
+      notice = `Mutation v${currentVersion}: map regenerated, keep climbing.`;
     };
 
-    const resetRun = () => {
-      running = true;
-      hp = 100;
-      score = 0;
-      orbCount = 0;
-      remaining = 90;
-      grounded = true;
-      invuln = 0;
-      dashBoost = 0;
-      dashCooldown = 0;
-      velocity.set(0, 0, 0);
-      moveDir.set(1, 0, 0);
+    const recoverToNearestPlatform = () => {
+      let candidate: Platform | null = null;
+      let bestY = -Infinity;
+      for (const p of platforms) {
+        const y = p.mesh.position.y + p.size.y / 2;
+        if (y > bestY && y <= player.position.y + 8) {
+          bestY = y;
+          candidate = p;
+        }
+      }
 
-      player.position.set(-8, startPlayerY, 0);
-      rebuildArenaFromState();
-      notice = "Run started. Reach the green goal with at least 3 relic orbs.";
+      if (!candidate) {
+        buildMap();
+        return;
+      }
+
+      player.position.set(
+        candidate.mesh.position.x,
+        candidate.mesh.position.y + candidate.size.y / 2 + PLAYER_HEIGHT / 2 + 0.05,
+        candidate.mesh.position.z
+      );
+      vel.set(0, 0, 0);
+      grounded = false;
+      coyoteTime = 0;
+      jumpBuffer = 0;
+      notice = "Recovered from fall. Keep going up.";
     };
 
-    const isOnPlatform = (x: number, z: number, footY: number, previousFootY: number) => {
+    const updateMovingPlatforms = (timeSec: number) => {
+      for (const p of platforms) {
+        if (p.driftAmp > 0) {
+          const offset = Math.sin(timeSec * p.driftSpeed * physics.platformDriftScale + p.driftPhase) * p.driftAmp;
+          if (p.driftAxis === "x") {
+            p.mesh.position.x = p.baseX + offset;
+          } else {
+            p.mesh.position.z = p.baseZ + offset;
+          }
+        }
+      }
+
+      for (const b of bumpers) {
+        b.phase += b.speed * 0.016 * (1 + arenaRef.current.enemySpeed * 0.2);
+        b.mesh.position.x = b.center.x + Math.cos(b.phase) * b.radius;
+        b.mesh.position.z = b.center.z + Math.sin(b.phase) * b.radius;
+      }
+
+      for (const r of rotors) {
+        r.pivot.rotation.y += r.speed * 0.016 * (1 + arenaRef.current.enemySpeed * 0.2);
+      }
+
+      for (const c of patchColliders) {
+        c.mesh.rotation.y += 0.02;
+      }
+    };
+
+    const getSupport = (x: number, z: number, footY: number, prevFootY: number): { top: number } | null => {
+      let bestTop: number | null = null;
+
+      // Stable base ground as persistent fallback (not moving/rising).
+      const groundTop = safetyDeck.position.y + 0.4;
+      const withinGround = Math.hypot(x, z) <= BASE_RADIUS + 2.3;
+      const groundCrossed = prevFootY >= groundTop - 0.3 && footY <= groundTop + 0.16;
+      const groundStanding = Math.abs(footY - groundTop) <= 0.2;
+      if (withinGround && (groundCrossed || groundStanding)) {
+        bestTop = groundTop;
+      }
+
       for (const p of platforms) {
         const px = p.mesh.position.x;
         const py = p.mesh.position.y;
         const pz = p.mesh.position.z;
         const top = py + p.size.y / 2;
-        const halfX = p.size.x / 2 + playerRadius * 0.75;
-        const halfZ = p.size.z / 2 + playerRadius * 0.75;
 
+        const halfX = p.size.x / 2 + PLAYER_RADIUS * 0.75;
+        const halfZ = p.size.z / 2 + PLAYER_RADIUS * 0.75;
         const within = Math.abs(x - px) <= halfX && Math.abs(z - pz) <= halfZ;
-        const crossed = previousFootY >= top - 0.1 && footY <= top + 0.08;
-        const standing = Math.abs(footY - top) <= 0.18 || Math.abs(previousFootY - top) <= 0.18;
-        if (within && (crossed || standing)) {
-          return top;
-        }
-      }
-      return null;
-    };
+        if (!within) continue;
 
-    const applyInput = (delta: number) => {
-      const forward = Number(keys.ArrowUp || keys.w) - Number(keys.ArrowDown || keys.s);
-      const sideways = Number(keys.ArrowRight || keys.d) - Number(keys.ArrowLeft || keys.a);
+        const crossed = prevFootY >= top - 0.25 && footY <= top + 0.14;
+        const standing = Math.abs(footY - top) <= 0.2;
+        if (!crossed && !standing) continue;
 
-      const dirXZ = new THREE.Vector3(sideways, 0, -forward);
-      if (dirXZ.lengthSq() > 0) {
-        dirXZ.normalize();
-        moveDir.lerp(dirXZ, 0.35);
-      }
-
-      if ((keys[" "] || keys.Space) && grounded) {
-        velocity.y = 8.7;
-        grounded = false;
-      }
-
-      if (keys.Shift && dashCooldown <= 0) {
-        dashBoost = 0.18;
-        dashCooldown = 1.2;
-      }
-
-      const baseSpeed = 7.5;
-      const speedScale = 1 + arenaRef.current.enemySpeed * 0.08;
-      const dashScale = dashBoost > 0 ? 2.5 : 1;
-      const moveSpeed = baseSpeed * speedScale * dashScale;
-
-      const vx = moveDir.x * moveSpeed * (dirXZ.lengthSq() > 0 ? 1 : 0);
-      const vz = moveDir.z * moveSpeed * (dirXZ.lengthSq() > 0 ? 1 : 0);
-
-      player.position.x = THREE.MathUtils.clamp(player.position.x + vx * delta, WORLD_BOUNDS.minX, WORLD_BOUNDS.maxX);
-      player.position.z = THREE.MathUtils.clamp(player.position.z + vz * delta, WORLD_BOUNDS.minZ, WORLD_BOUNDS.maxZ);
-
-      if (dirXZ.lengthSq() > 0.01) {
-        const angle = Math.atan2(moveDir.x, moveDir.z);
-        player.rotation.y = angle;
-      }
-
-      dashBoost = Math.max(0, dashBoost - delta);
-      dashCooldown = Math.max(0, dashCooldown - delta);
-    };
-
-    const applyPhysics = (delta: number) => {
-      const previousFoot = player.position.y - playerHeight / 2;
-      velocity.y -= 18 * delta;
-      player.position.y += velocity.y * delta;
-
-      const foot = player.position.y - playerHeight / 2;
-      const supportTop = isOnPlatform(player.position.x, player.position.z, foot, previousFoot);
-
-      if (supportTop !== null && velocity.y <= 0) {
-        player.position.y = supportTop + playerHeight / 2;
-        velocity.y = 0;
-        grounded = true;
-      } else {
-        grounded = false;
-      }
-
-      if (player.position.y < -3.2) {
-        hp = 0;
-        notice = "You fell into the abyss.";
-      }
-    };
-
-    const updateArenaEntities = (elapsed: number, delta: number) => {
-      const arena = arenaRef.current;
-      const hazardSpeed = 0.8 + arena.enemySpeed * 0.45;
-
-      for (const h of hazards) {
-        const t = elapsed * hazardSpeed + h.phase;
-        if (h.axis === "x") {
-          h.mesh.position.x = h.base.x + Math.sin(t) * h.range;
-        } else {
-          h.mesh.position.z = h.base.z + Math.sin(t) * h.range;
-        }
-        h.mesh.rotation.x += delta * 1.8;
-        h.mesh.rotation.y += delta * 1.2;
-
-        const hitDist = 0.8;
-        if (player.position.distanceTo(h.mesh.position) < hitDist && invuln <= 0) {
-          hp -= THREE.MathUtils.clamp(6 + arena.hazardRate * 0.08, 6, 18);
-          invuln = 0.5;
-          notice = "Hit by sentinel hazard.";
+        if (bestTop === null || top > bestTop) {
+          bestTop = top;
         }
       }
 
-      for (const patch of patchHazards) {
-        if (player.position.distanceTo(patch.position) < 0.75 && invuln <= 0) {
-          hp -= THREE.MathUtils.clamp(5 + arena.hazardRate * 0.06, 5, 14);
-          invuln = 0.45;
-          notice = "Touched a patched dungeon trap.";
-        }
-      }
-
-      for (const orb of orbs) {
-        if (orb.taken) continue;
-        orb.mesh.rotation.y += delta * 1.7;
-        orb.mesh.position.y += Math.sin(elapsed * 2.8 + orb.mesh.position.x) * 0.002;
-
-        if (player.position.distanceTo(orb.mesh.position) < 0.85) {
-          orb.taken = true;
-          orb.mesh.visible = false;
-          orbCount += 1;
-          score += Math.round(25 * arena.lootMultiplier);
-          notice = `Relic collected (${orbCount}).`;
-        }
-      }
-
-      if (running && player.position.distanceTo(goal.position) < 1.1) {
-        if (orbCount >= 3) {
-          score += Math.round(remaining * 4 + hp * 2);
-          running = false;
-          notice = `Goal reached. Final score ${score}.`;
-        } else {
-          notice = "Goal locked. Collect at least 3 relic orbs.";
-        }
-      }
-
-      const lavaDamage = THREE.MathUtils.clamp((arena.hazardRate - 20) * 0.015, 0, 1.4);
-      if (running && lavaDamage > 0) {
-        hp -= lavaDamage * delta;
-      }
-
-      goal.rotation.y += delta * 1.4;
-      invuln = Math.max(0, invuln - delta);
-    };
-
-    const syncCamera = (delta: number) => {
-      const followOffset = new THREE.Vector3(-4.8, 4.2, 6.6);
-      const targetCam = player.position.clone().add(followOffset);
-      camera.position.lerp(targetCam, Math.min(1, delta * 5));
-      camera.lookAt(player.position.x + 1.2, player.position.y + 0.5, player.position.z);
+      return bestTop === null ? null : { top: bestTop };
     };
 
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key in keys) {
-        keys[e.key] = true;
-      }
+      if (e.key in keys) keys[e.key] = true;
+      if (e.key === "r" || e.key === "R") cameraPitch = Math.min(1.12, cameraPitch + 0.05);
+      if (e.key === "f" || e.key === "F") cameraPitch = Math.max(0.22, cameraPitch - 0.05);
     };
 
     const onKeyUp = (e: KeyboardEvent) => {
-      if (e.key in keys) {
-        keys[e.key] = false;
-      }
+      if (e.key in keys) keys[e.key] = false;
     };
 
     const onResize = () => updateRendererSize();
+    const onWheel = (e: WheelEvent) => {
+      cameraPitch = THREE.MathUtils.clamp(cameraPitch + e.deltaY * 0.0009, 0.22, 1.15);
+    };
 
     window.addEventListener("keydown", onKeyDown);
     window.addEventListener("keyup", onKeyUp);
     window.addEventListener("resize", onResize);
+    window.addEventListener("wheel", onWheel, { passive: true });
+
+    const applyImpulse = (source: any, label: string) => {
+      if (knockbackCooldown > 0) return;
+      const push = player.position.clone().sub(source);
+      push.y = 0;
+      if (push.lengthSq() < 0.0001) push.set(0.001, 0, 1);
+      push.normalize();
+
+      vel.x = push.x * physics.collisionPush;
+      vel.z = push.z * physics.collisionPush;
+      vel.y = Math.max(vel.y, 2.6 + arenaRef.current.enemySpeed * 0.2);
+      knockbackCooldown = 0.2;
+      notice = label;
+    };
+
+    const applyInput = (delta: number) => {
+      const f = Number(keys.ArrowUp || keys.w) - Number(keys.ArrowDown || keys.s);
+      const s = Number(keys.ArrowRight || keys.d) - Number(keys.ArrowLeft || keys.a);
+
+      const input = new THREE.Vector3(s, 0, -f);
+      if (input.lengthSq() > 0) {
+        input.normalize();
+        moveDir.lerp(input, 0.4);
+      }
+
+      const jumpDown = keys[" "];
+      const jumpPressed = jumpDown && !wasJumpDown;
+      wasJumpDown = jumpDown;
+      if (jumpPressed) jumpBuffer = 0.14;
+
+      if (jumpBuffer > 0 && coyoteTime > 0) {
+        vel.y = 9.3;
+        grounded = false;
+        coyoteTime = 0;
+        jumpBuffer = 0;
+        jumpHold = 0.15;
+      }
+
+      if (jumpDown && jumpHold > 0) {
+        vel.y += 23 * delta;
+        jumpHold -= delta;
+      } else {
+        jumpHold = 0;
+      }
+
+      if (keys.Shift && dashCooldown <= 0) {
+        dashBoost = 0.15;
+        dashCooldown = 1.0;
+      }
+
+      const moveSpeed = 8.4 * (1 + arenaRef.current.enemySpeed * 0.07) * (dashBoost > 0 ? 2 : 1);
+      const targetX = moveDir.x * moveSpeed * (input.lengthSq() > 0 ? 1 : 0);
+      const targetZ = moveDir.z * moveSpeed * (input.lengthSq() > 0 ? 1 : 0);
+
+      const accel = grounded ? 19 : 11;
+      vel.x = THREE.MathUtils.lerp(vel.x, targetX, Math.min(1, accel * delta));
+      vel.z = THREE.MathUtils.lerp(vel.z, targetZ, Math.min(1, accel * delta));
+
+      if (input.lengthSq() > 0.01) {
+        player.rotation.y = Math.atan2(moveDir.x, moveDir.z);
+      }
+
+      dashBoost = Math.max(0, dashBoost - delta);
+      dashCooldown = Math.max(0, dashCooldown - delta);
+      jumpBuffer = Math.max(0, jumpBuffer - delta);
+      coyoteTime = Math.max(0, coyoteTime - delta);
+      knockbackCooldown = Math.max(0, knockbackCooldown - delta);
+    };
+
+    const applyPhysics = (delta: number) => {
+      const prevFootY = player.position.y - PLAYER_HEIGHT / 2;
+
+      // Mario-like jump arc: lighter gravity when rising with button held, heavier when falling.
+      const jumpDown = keys[" "];
+      let gravity = physics.gravity;
+      if (vel.y > 0) {
+        gravity = jumpDown ? physics.gravity * 0.62 : physics.gravity * 1.5;
+      } else {
+        gravity = physics.gravity * 1.2;
+      }
+
+      vel.y -= gravity * delta;
+
+      player.position.x += vel.x * delta;
+      player.position.z += vel.z * delta;
+      player.position.y += vel.y * delta;
+
+      const footY = player.position.y - PLAYER_HEIGHT / 2;
+      const support = getSupport(player.position.x, player.position.z, footY, prevFootY);
+
+      if (support && vel.y <= 0) {
+        player.position.y = support.top + PLAYER_HEIGHT / 2;
+        vel.y = 0;
+        grounded = true;
+        coyoteTime = 0.12;
+      } else {
+        grounded = false;
+      }
+
+      if (player.position.y < FALL_DEATH_Y) {
+        recoverToNearestPlatform();
+      }
+    };
+
+    const updateCollisions = () => {
+      for (const r of rotors) {
+        const rel = player.position.clone().sub(r.pivot.position);
+        rel.applyAxisAngle(new THREE.Vector3(0, 1, 0), -r.pivot.rotation.y);
+
+        const hitY = Math.abs(rel.y) <= r.height / 2 + PLAYER_HEIGHT * 0.46;
+        const hitX = Math.abs(rel.x) <= r.width / 2 + PLAYER_RADIUS;
+        const hitZ = Math.abs(rel.z) <= r.length / 2 + PLAYER_RADIUS;
+        if (hitY && hitX && hitZ) {
+          applyImpulse(r.pivot.position, "Rotor collision.");
+        }
+      }
+
+      for (const b of bumpers) {
+        if (player.position.distanceTo(b.mesh.position) < 1.08) {
+          applyImpulse(b.mesh.position, "Bumper collision.");
+        }
+      }
+
+      for (const c of patchColliders) {
+        if (player.position.distanceTo(c.pos) < c.radius) {
+          applyImpulse(c.pos, "Patch collider impact.");
+        }
+      }
+    };
+
+    const maybeRegenerateOnMutation = () => {
+      if (arenaRef.current.versionId === currentVersion) return;
+      currentVersion = arenaRef.current.versionId;
+
+      buildMap();
+      recoverToNearestPlatform();
+      notice = `On-chain update v${currentVersion}: map regenerated and physics updated.`;
+    };
+
+    const updateCamera = (delta: number) => {
+      const upBias = Math.max(0, player.position.y * 0.06);
+      const radius = 10.2;
+      const y = Math.sin(cameraPitch) * radius;
+      const z = Math.cos(cameraPitch) * radius;
+      const behind = new THREE.Vector3(0, 3 + y + upBias, z);
+      const desired = player.position.clone().add(behind);
+      camera.position.lerp(desired, Math.min(1, delta * 4.3));
+      camera.lookAt(player.position.x, player.position.y + 1.0, player.position.z);
+    };
 
     updateRendererSize();
-    rebuildArenaFromState();
+    buildMap();
+    // Auto-start when user opens page.
+    running = true;
 
     const frame = () => {
       const now = performance.now();
       const delta = Math.min(0.05, (now - lastTick) / 1000);
-      const elapsed = now / 1000;
+      const nowSec = now / 1000;
       lastTick = now;
 
       if (runNonceRef.current !== seenRunNonce) {
         seenRunNonce = runNonceRef.current;
-        resetRun();
+        running = true;
+        recoverToNearestPlatform();
+        notice = "Run recentered. Keep climbing.";
       }
+
+      maybeRegenerateOnMutation();
 
       if (running) {
-        remaining = Math.max(0, remaining - delta);
+        elapsed += delta;
+        bestAltitude = Math.max(bestAltitude, player.position.y);
+        score = Math.round(elapsed * (100 + arenaRef.current.lootMultiplier * 28));
+
+        updateMovingPlatforms(nowSec);
         applyInput(delta);
         applyPhysics(delta);
-        updateArenaEntities(elapsed, delta);
-
-        if (remaining <= 0 && running) {
-          running = false;
-          notice = `Time out. Final score ${score}.`;
-        }
-        if (hp <= 0 && running) {
-          running = false;
-          notice = "Run failed. Try again with better routing.";
-        }
+        updateCollisions();
       }
 
-      skyRing.rotation.z += delta * 0.2;
-      syncCamera(delta);
+      skyRing.rotation.z += delta * 0.17;
+      updateCamera(delta);
       renderer.render(scene, camera);
 
       if (now - lastHudSync > 120) {
         lastHudSync = now;
         setHud({
-          hp: Math.max(0, Math.round(hp)),
-          time: Math.max(0, remaining),
-          orbs: orbCount,
-          score: Math.round(score),
+          altitude: Math.max(0, player.position.y),
+          bestAltitude,
+          score,
           version: arenaRef.current.versionId,
+          gravity: physics.gravity,
+          danger: arenaRef.current.hazardRate,
           message: notice
         });
       }
@@ -520,7 +695,8 @@ export function GameCanvas({ versionId, hazardRate, enemySpeed, lootMultiplier, 
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("keyup", onKeyUp);
       window.removeEventListener("resize", onResize);
-      clearArenaObjects();
+      window.removeEventListener("wheel", onWheel);
+      clearArena();
       renderer.dispose();
       hostRef.current?.removeChild(renderer.domElement);
     };
@@ -529,8 +705,8 @@ export function GameCanvas({ versionId, hazardRate, enemySpeed, lootMultiplier, 
   return (
     <div className="game-canvas" ref={hostRef}>
       <div className="game-overlay">
-        <div className="game-line">v{hud.version} | HP {hud.hp} | Time {hud.time.toFixed(1)}s</div>
-        <div className="game-line">Relics {hud.orbs}/3 | Score {hud.score}</div>
+        <div className="game-line">v{hud.version} | Gravity {hud.gravity.toFixed(1)} | Danger {hud.danger}%</div>
+        <div className="game-line">Altitude {hud.altitude.toFixed(1)} | Best {hud.bestAltitude.toFixed(1)} | Score {hud.score}</div>
         <div className="game-note">{hud.message}</div>
       </div>
     </div>

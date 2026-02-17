@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { fetchArena, commitMutation, openArenaSocket, type ArenaStateResponse } from "./lib/api";
+import { fetchArena, commitMutation, type ArenaStateResponse } from "./lib/api";
 import { GameCanvas } from "./components/GameCanvas";
 import { ControlPanel } from "./components/ControlPanel";
 
@@ -26,31 +26,39 @@ export default function App() {
   const [latestTxHash, setLatestTxHash] = useState<string>();
   const [runNonce, setRunNonce] = useState(1);
   const [hasStarted, setHasStarted] = useState(false);
+  const [isChainReady, setIsChainReady] = useState(false);
 
   useEffect(() => {
-    fetchArena(arenaId)
-      .then(setArena)
-      .catch(() => setStatus("Failed to load arena state"));
+    let cancelled = false;
+    let seenVersion = initialArena.versionId;
 
-    const ws = openArenaSocket((payload: unknown) => {
-      const event = payload as {
-        type?: string;
-        txHash?: string;
-        state?: ArenaStateResponse;
-      };
-
-      if (event.type === "mutation_applied" && event.state) {
-        setArena(event.state);
-        setLatestTxHash(event.txHash);
-        setStatus(`On-chain mutation applied at version ${event.state.versionId}`);
+    const sync = async () => {
+      try {
+        const next = await fetchArena(arenaId);
+        if (cancelled) return;
+        setArena(next);
+        setIsChainReady(true);
+        if (next.versionId > seenVersion) {
+          seenVersion = next.versionId;
+          setStatus(`On-chain mutation applied at version ${next.versionId}`);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          const message = error instanceof Error ? error.message : "unknown-read-error";
+          setStatus(`Failed to read on-chain state: ${message}`);
+        }
       }
+    };
 
-      if (event.type === "announcement") {
-        setStatus("Dungeon master announced a phase shift");
-      }
-    });
+    void sync();
+    const interval = window.setInterval(() => {
+      void sync();
+    }, 4000);
 
-    return () => ws.close();
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
   }, []);
 
   const onCommit = async () => {
@@ -77,7 +85,7 @@ export default function App() {
     return (
       <main>
         <section className="landing">
-          <p className="landing-kicker">Up-Only Onchain Chaos</p>
+          <p className="landing-kicker">Up-Only Onchain Dungeon Updates</p>
           <h1>Relic Run: Dungeon Under Rewrite</h1>
           <p>
             This is an Up Only style game. The dungeon is managed by an AI agent that reads game state, commits
@@ -102,6 +110,19 @@ export default function App() {
               Run your own agent (GitHub)
             </a>
           </div>
+        </section>
+      </main>
+    );
+  }
+
+  if (!isChainReady) {
+    return (
+      <main>
+        <section className="landing">
+          <p className="landing-kicker">Loading</p>
+          <h1>Loading game state on-chain...</h1>
+          <p>Reading latest arena state from BSC testnet before starting gameplay.</p>
+          <p className="status">{status}</p>
         </section>
       </main>
     );

@@ -25,9 +25,9 @@ export function ControlPanel(props: Props) {
         <li>Patched Tiles: {props.patchTiles}</li>
       </ul>
       {props.agentModeEnabled ? (
-        <p className="subtle">Agent mode enabled: chaos commits are automated.</p>
+        <p className="subtle">Agent mode enabled: dungeon update commits are automated.</p>
       ) : (
-        <button onClick={() => void props.onCommit()}>Commit Chaos Update</button>
+        <button onClick={() => void props.onCommit()}>Commit Dungeon Update</button>
       )}
       <p className="status">{props.status}</p>
       <p className="subtle">

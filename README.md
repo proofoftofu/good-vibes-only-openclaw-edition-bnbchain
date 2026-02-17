@@ -7,7 +7,7 @@ This creates a verifiable loop:
 1. DM agent proposes bounded mutation.
 2. DM submits `commitMutation` tx on BSC testnet.
 3. Server watches `MutationCommitted` event and applies only the next monotonic version.
-4. Players instantly see the dungeon update and can inspect tx hash.
+4. Frontend reads contract state directly and updates gameplay from onchain versions.
 
 ## Benefit
 - Verifiable fairness: no hidden server-only rule edits.
@@ -34,7 +34,7 @@ This creates a verifiable loop:
 - Watches `MutationCommitted` on BSC testnet via `viem`.
 - Decodes committed mutation data and validates against bounded schema.
 - Applies mutation only if `(arenaId, versionId)` is exactly next expected version.
-- Broadcasts tx hash + updated state to clients.
+- Exposes write/agent APIs (`/commit`, `/agent/context`, `/agent/command`) for DM automation.
 
 ### DM Agent service (`server/src/agent/dmAgent.ts`)
 Implements requested interface:
@@ -46,6 +46,7 @@ Implements requested interface:
 ### Web client (`web/`)
 - React HUD + Three.js 3D survival arena inspired by elimination party games.
 - Landing page explains the game loop and AI-managed dungeon updates before entering gameplay.
+- Reads `DungeonStateCommit` state directly from BSC testnet using `viem` public client.
 - Mechanics: complex multi-level map, moving platforms, sweepers, bumpers, falling blocks, jump + dash movement.
 - Physics-first elimination: no HP system; collisions apply knockback and players are eliminated when they fall off-map.
 - Chaos pacing inspired by `chaos-arena-public`:
@@ -59,7 +60,7 @@ Implements requested interface:
   - `SET_LOOT_MULTIPLIER` -> survival score scaling
   - `PATCH_TILES` -> extra trap objects/distractions mapped into arena
 - Optional admin action button for manual mutation commit (can be disabled in agent mode).
-- Real-time mutation updates over websocket (tx hash and new versioned state).
+- Commit action still goes through server write endpoint.
 
 ## How To Run
 ### 1) Install dependencies
@@ -72,10 +73,13 @@ npm install
 Create `workspace/.env` (copy from `.env.example`):
 ```env
 BSC_TESTNET_RPC_URL=https://data-seed-prebsc-1-s1.binance.org:8545
+VITE_BSC_TESTNET_RPC_URL=https://data-seed-prebsc-1-s1.binance.org:8545
 PRIVATE_KEY=0x...
 DUNGEON_COMMIT_ADDRESS=0x...
+VITE_DUNGEON_COMMIT_ADDRESS=0x...
 VITE_BSC_TESTNET_CHAIN_ID=97
 VITE_ARENA_ID=1
+VITE_API_BASE_URL=http://localhost:8787
 AGENT_AUTOCOMMIT_ENABLED=true
 AGENT_AUTOCOMMIT_INTERVAL_MS=25000
 AGENT_AUTOCOMMIT_STARTUP_DELAY_MS=7000
@@ -91,6 +95,7 @@ Deployment output is written to:
 - `contracts/deployments/bscTestnet.json`
 
 Set `DUNGEON_COMMIT_ADDRESS` from this output in `.env`.
+Set `VITE_DUNGEON_COMMIT_ADDRESS` to the same value for frontend direct contract reads.
 
 ### 4) Register DM agent and create arena (required once)
 ```bash

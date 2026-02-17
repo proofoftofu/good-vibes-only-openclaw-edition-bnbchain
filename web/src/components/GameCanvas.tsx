@@ -722,7 +722,7 @@ export function GameCanvas({
             Math.round(arenaRef.current.enemySpeed * 101) +
             Math.round(arenaRef.current.lootMultiplier * 151))
       );
-      notice = `On-chain chaos v${currentVersion}: gravity ${physics.gravity.toFixed(1)}, push ${physics.collisionPush.toFixed(1)}.`;
+      notice = `On-chain dungeon update v${currentVersion}: gravity ${physics.gravity.toFixed(1)}, push ${physics.collisionPush.toFixed(1)}.`;
     };
 
     const updateCamera = (delta: number) => {

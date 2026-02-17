@@ -47,7 +47,7 @@ export default function App() {
       if (event.type === "mutation_applied" && event.state) {
         setArena(event.state);
         setLatestTxHash(event.txHash);
-        setStatus("Mutation applied from committed onchain version");
+        setStatus(`On-chain mutation applied at version ${event.state.versionId}`);
       }
 
       if (event.type === "announcement") {
@@ -68,7 +68,7 @@ export default function App() {
       const updated = await waitForArenaVersion(arenaId, previousVersion);
       if (updated) {
         setArena(updated);
-        setStatus(`Mutation applied at version ${updated.versionId}`);
+        setStatus(`On-chain mutation applied at version ${updated.versionId}`);
       } else {
         setStatus("Tx confirmed, but apply event delayed. Check server logs.");
       }
@@ -97,13 +97,21 @@ export default function App() {
       </header>
 
       <section className="layout">
-        <GameCanvas hazardRate={arena.hazardRate} enemySpeed={arena.enemySpeed} runNonce={runNonce} />
+        <GameCanvas
+          versionId={arena.versionId}
+          hazardRate={arena.hazardRate}
+          enemySpeed={arena.enemySpeed}
+          lootMultiplier={arena.lootMultiplier}
+          tiles={arena.tiles}
+          runNonce={runNonce}
+        />
         <ControlPanel
           arenaId={arena.arenaId}
           versionId={arena.versionId}
           hazardRate={arena.hazardRate}
           enemySpeed={arena.enemySpeed}
           lootMultiplier={arena.lootMultiplier}
+          patchTiles={arena.tiles.length}
           status={status}
           latestTxHash={latestTxHash}
           onStartRun={() => {

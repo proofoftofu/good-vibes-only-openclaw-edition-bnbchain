@@ -4,6 +4,7 @@ interface Props {
   hazardRate: number;
   enemySpeed: number;
   lootMultiplier: number;
+  patchTiles: number;
   status: string;
   latestTxHash?: string;
   onStartRun: () => void;
@@ -20,6 +21,7 @@ export function ControlPanel(props: Props) {
         <li>Hazard Rate: {props.hazardRate}%</li>
         <li>Enemy Speed: {props.enemySpeed.toFixed(2)}x</li>
         <li>Loot Multiplier: {props.lootMultiplier.toFixed(2)}x</li>
+        <li>Patched Tiles: {props.patchTiles}</li>
       </ul>
       <button onClick={props.onStartRun}>Start Run</button>
       <button onClick={() => void props.onCommit()}>Commit Next Mutation</button>

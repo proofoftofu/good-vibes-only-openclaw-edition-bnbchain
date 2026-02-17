@@ -54,14 +54,16 @@ main {
   width: 100%;
   height: auto;
   border-radius: 12px;
-  border: 1px solid #94a3b8;
+  border: 1px solid #38bdf8;
+  box-shadow: 0 20px 40px rgba(2, 6, 23, 0.55), 0 0 0 2px rgba(125, 211, 252, 0.2);
 }
 
 .panel {
-  background: rgba(15, 23, 42, 0.8);
-  border: 1px solid #475569;
-  border-radius: 12px;
-  padding: 16px;
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.95), rgba(9, 14, 26, 0.93));
+  border: 1px solid #3b82f6;
+  border-radius: 14px;
+  padding: 18px;
+  box-shadow: 0 10px 30px rgba(2, 6, 23, 0.45);
 }
 
 .panel h2 {
@@ -71,6 +73,7 @@ main {
 .panel ul {
   padding-left: 18px;
   margin-top: 0;
+  line-height: 1.5;
 }
 
 .subtle {
@@ -78,9 +81,13 @@ main {
 }
 
 .status {
-  min-height: 40px;
+  min-height: 52px;
   font-size: 0.95rem;
-  color: #e2e8f0;
+  color: #dbeafe;
+  padding: 10px;
+  border-radius: 8px;
+  background: rgba(30, 41, 59, 0.7);
+  border: 1px solid rgba(125, 211, 252, 0.25);
 }
 
 .tx-hash code {

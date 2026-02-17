@@ -3,12 +3,15 @@ import Phaser from "phaser";
 import { ArenaScene } from "../game/arenaScene";
 
 interface Props {
+  versionId: number;
   hazardRate: number;
   enemySpeed: number;
+  lootMultiplier: number;
+  tiles: [string, string][];
   runNonce: number;
 }
 
-export function GameCanvas({ hazardRate, enemySpeed, runNonce }: Props) {
+export function GameCanvas({ versionId, hazardRate, enemySpeed, lootMultiplier, tiles, runNonce }: Props) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const sceneRef = useRef<ArenaScene | null>(null);
 
@@ -36,8 +39,8 @@ export function GameCanvas({ hazardRate, enemySpeed, runNonce }: Props) {
   }, []);
 
   useEffect(() => {
-    sceneRef.current?.applyInput({ hazardRate, enemySpeed });
-  }, [hazardRate, enemySpeed]);
+    sceneRef.current?.applyInput({ versionId, hazardRate, enemySpeed, lootMultiplier, tiles });
+  }, [versionId, hazardRate, enemySpeed, lootMultiplier, tiles]);
 
   useEffect(() => {
     if (runNonce > 0) {

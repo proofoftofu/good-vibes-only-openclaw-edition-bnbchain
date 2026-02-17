@@ -43,7 +43,13 @@ Implements requested interface:
 - `announce_change(arenaId, message)`
 
 ### Web client (`web/`)
-- React HUD + Phaser arena canvas.
+- React HUD + Phaser arena canvas with single-player extraction loop.
+- Mechanics: chase enemies, dynamic hazard spawns, shard collection economy, dash cooldown, extraction gate.
+- On-chain state impact:
+  - `SET_HAZARD_RATE` -> hazard pressure and spawn target
+  - `SET_ENEMY_SPEED` -> hunter movement speed
+  - `SET_LOOT_MULTIPLIER` -> shard score value
+  - `PATCH_TILES` -> blocked/hazard tile overlays in map
 - Wallet connection via wagmi/viem.
 - Admin action button for committing next DM mutation.
 - Real-time mutation updates over websocket (tx hash and new versioned state).
@@ -97,9 +103,9 @@ npm run dev --workspace web
 1. Deploy contracts and set `DUNGEON_COMMIT_ADDRESS`.
 2. Run bootstrap script and set `VITE_ARENA_ID`.
 3. Open web app and connect wallet on BSC testnet.
-4. Click `Start Run` and move with arrow keys.
-5. Click `Commit Next Mutation`.
-6. Observe tx hash in UI and state version increment in real time.
+4. Click `Start Run`, collect shards, avoid hunters/hazards, and extract before collapse.
+5. Click `Commit Next Mutation` during a run.
+6. Observe versioned on-chain mutation visibly changing pressure, speed, loot value, or patched tiles.
 
 ## Scope Notes (MVP)
 - Single game mode (`Dungeon Sprint`) with one arena template.

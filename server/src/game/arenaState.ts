@@ -11,6 +11,7 @@ export interface ReplayRound {
 export interface ArenaState {
   arenaId: number;
   versionId: number;
+  baseAltitude: number;
   hazardRate: number;
   enemySpeed: number;
   lootMultiplier: number;
@@ -23,6 +24,7 @@ export function createArenaState(arenaId: number): ArenaState {
   return {
     arenaId,
     versionId: 0,
+    baseAltitude: 0,
     hazardRate: 30,
     enemySpeed: 1,
     lootMultiplier: 1,
@@ -41,6 +43,8 @@ export function applyMutation(state: ArenaState, mutation: MutationPayload, vers
     state.enemySpeed = mutation.enemySpeed;
   } else if (mutation.mutationType === "SET_LOOT_MULTIPLIER") {
     state.lootMultiplier = mutation.lootMultiplier;
+  } else if (mutation.mutationType === "ADVANCE_ALTITUDE") {
+    state.baseAltitude = mutation.altitude;
   } else {
     state.tiles.set(`${mutation.x}:${mutation.y}`, mutation.tileState);
   }

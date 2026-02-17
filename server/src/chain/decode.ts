@@ -5,7 +5,8 @@ const types: MutationType[] = [
   "SET_HAZARD_RATE",
   "SET_ENEMY_SPEED",
   "SET_LOOT_MULTIPLIER",
-  "PATCH_TILES"
+  "PATCH_TILES",
+  "ADVANCE_ALTITUDE"
 ];
 
 export function mutationTypeFromIndex(index: number): MutationType {
@@ -30,6 +31,11 @@ export function decodeMutationData(mutationType: MutationType, mutationData: `0x
   if (mutationType === "SET_LOOT_MULTIPLIER") {
     const [lootMultiplierBps] = decodeAbiParameters(parseAbiParameters("uint16"), mutationData);
     return { mutationType, lootMultiplier: Number(lootMultiplierBps) / 100 };
+  }
+
+  if (mutationType === "ADVANCE_ALTITUDE") {
+    const [altitude] = decodeAbiParameters(parseAbiParameters("uint32"), mutationData);
+    return { mutationType, altitude: Number(altitude) };
   }
 
   const [x, y, tileState] = decodeAbiParameters(parseAbiParameters("uint8, uint8, uint8"), mutationData);

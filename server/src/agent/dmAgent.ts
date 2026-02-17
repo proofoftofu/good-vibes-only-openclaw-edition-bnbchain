@@ -99,7 +99,18 @@ export class DmAgentService {
     return `[Arena ${arenaId}] ${message}`;
   }
 
-  async runMutationTurn(arena: ArenaState): Promise<AgentActionResult> {
+  async runMutationTurn(arena: ArenaState, requestedAltitude?: number): Promise<AgentActionResult> {
+    if (Number.isFinite(requestedAltitude)) {
+      const altitude = Math.max(0, Math.floor(requestedAltitude as number));
+      const payload: MutationPayload = { mutationType: "ADVANCE_ALTITUDE", altitude };
+      const txHash = await this.commit_mutation(arena.arenaId, payload);
+      return {
+        txHash,
+        payload,
+        rationale: `Advance map generation baseline to altitude ${altitude}.`
+      };
+    }
+
     const context = this.get_arena_context(arena);
     const { payload, rationale } = this.propose_mutation(context);
     const txHash = await this.commit_mutation(arena.arenaId, payload);
@@ -126,6 +137,13 @@ function encodeMutation(payload: MutationPayload): { mutationTypeIndex: number; 
     return {
       mutationTypeIndex: 2,
       mutationData: encodeAbiParameters(parseAbiParameters("uint16"), [Math.round(payload.lootMultiplier * 100)])
+    };
+  }
+
+  if (payload.mutationType === "ADVANCE_ALTITUDE") {
+    return {
+      mutationTypeIndex: 4,
+      mutationData: encodeAbiParameters(parseAbiParameters("uint32"), [payload.altitude])
     };
   }
 

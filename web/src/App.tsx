@@ -9,6 +9,7 @@ const arenaId = Number(import.meta.env.VITE_ARENA_ID || 1);
 const initialArena: ArenaStateResponse = {
   arenaId,
   versionId: 0,
+  baseAltitude: 0,
   hazardRate: 30,
   enemySpeed: 1,
   lootMultiplier: 1,
@@ -18,6 +19,7 @@ const initialArena: ArenaStateResponse = {
 
 export default function App() {
   const [arena, setArena] = useState<ArenaStateResponse>(initialArena);
+  const [currentAltitude, setCurrentAltitude] = useState(0);
   const [status, setStatus] = useState("Ready");
   const [latestTxHash, setLatestTxHash] = useState<string>();
   const [runNonce, setRunNonce] = useState(0);
@@ -69,7 +71,8 @@ export default function App() {
     try {
       const result = await commitMutation(arenaId);
       setLatestTxHash(result.txHash);
-      setStatus("Transaction confirmed. Waiting for watcher apply...");
+      const committedType = result?.payload?.mutationType ? String(result.payload.mutationType) : "mutation";
+      setStatus(`Transaction confirmed (${committedType}). Waiting for watcher apply...`);
       const updated = await waitForArenaVersion(arenaId, previousVersion);
       if (updated) {
         setArena(updated);
@@ -104,11 +107,13 @@ export default function App() {
       <section className="layout">
         <GameCanvas
           versionId={arena.versionId}
+          baseAltitude={arena.baseAltitude}
           hazardRate={arena.hazardRate}
           enemySpeed={arena.enemySpeed}
           lootMultiplier={arena.lootMultiplier}
           tiles={arena.tiles}
           runNonce={runNonce}
+          onAltitudeChange={setCurrentAltitude}
         />
         <ControlPanel
           arenaId={arena.arenaId}

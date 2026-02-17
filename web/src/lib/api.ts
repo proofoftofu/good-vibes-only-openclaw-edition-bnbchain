@@ -1,6 +1,7 @@
 export interface ArenaStateResponse {
   arenaId: number;
   versionId: number;
+  baseAltitude: number;
   hazardRate: number;
   enemySpeed: number;
   lootMultiplier: number;
@@ -18,10 +19,13 @@ export async function fetchArena(arenaId: number): Promise<ArenaStateResponse> {
   return res.json();
 }
 
-export async function commitMutation(arenaId: number) {
+export async function commitMutation(arenaId: number, altitude?: number) {
   const res = await fetch(`${API_BASE}/arena/${arenaId}/commit`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" }
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(
+      Number.isFinite(altitude) ? { altitude: Math.max(0, Math.floor(altitude as number)) } : {}
+    )
   });
   if (!res.ok) {
     throw new Error(`failed to commit mutation: ${res.status}`);

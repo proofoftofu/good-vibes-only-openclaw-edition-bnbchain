@@ -9,7 +9,8 @@ contract DungeonStateCommit {
         SET_HAZARD_RATE,
         SET_ENEMY_SPEED,
         SET_LOOT_MULTIPLIER,
-        PATCH_TILES
+        PATCH_TILES,
+        ADVANCE_ALTITUDE
     }
 
     struct Version {
@@ -31,6 +32,7 @@ contract DungeonStateCommit {
 
     mapping(uint256 => ArenaLatest) public latestVersion;
     mapping(uint256 => mapping(uint256 => Version)) public versions;
+    mapping(uint256 => uint256) public latestAltitude;
 
     event MutationCommitted(
         uint256 indexed arenaId,
@@ -39,6 +41,7 @@ contract DungeonStateCommit {
         bytes32 versionHash,
         address committer
     );
+    event AltitudeAdvanced(uint256 indexed arenaId, uint256 indexed versionId, uint256 altitude);
 
     constructor(address arenaRegistryAddress, address agentRegistryAddress) {
         require(arenaRegistryAddress != address(0), "invalid-arena-registry");
@@ -54,7 +57,7 @@ contract DungeonStateCommit {
         bytes calldata mutationData,
         bytes32 versionHash
     ) external returns (uint256 versionId) {
-        require(uint256(mutationType) <= uint256(MutationType.PATCH_TILES), "invalid-mutation-type");
+        require(uint256(mutationType) <= uint256(MutationType.ADVANCE_ALTITUDE), "invalid-mutation-type");
         require(versionHash != bytes32(0), "invalid-version-hash");
 
         ArenaRegistry.Arena memory arena = arenaRegistry.getArena(arenaId);
@@ -74,6 +77,12 @@ contract DungeonStateCommit {
         });
 
         emit MutationCommitted(arenaId, versionId, mutationType, versionHash, msg.sender);
+
+        if (mutationType == uint8(MutationType.ADVANCE_ALTITUDE)) {
+            uint256 altitude = uint256(abi.decode(mutationData, (uint32)));
+            latestAltitude[arenaId] = altitude;
+            emit AltitudeAdvanced(arenaId, versionId, altitude);
+        }
     }
 
     function getVersion(uint256 arenaId, uint256 versionId) external view returns (Version memory) {

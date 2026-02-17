@@ -4,7 +4,8 @@ export const mutationTypes = [
   "SET_HAZARD_RATE",
   "SET_ENEMY_SPEED",
   "SET_LOOT_MULTIPLIER",
-  "PATCH_TILES"
+  "PATCH_TILES",
+  "ADVANCE_ALTITUDE"
 ] as const;
 
 export type MutationType = (typeof mutationTypes)[number];
@@ -34,6 +35,10 @@ export const mutationPayloadSchema = z.discriminatedUnion("mutationType", [
     x: z.number().int().min(0).max(19),
     y: z.number().int().min(0).max(19),
     tileState: bounds.tileState
+  }),
+  z.object({
+    mutationType: z.literal("ADVANCE_ALTITUDE"),
+    altitude: z.number().int().min(0).max(1000000)
   })
 ]);
 

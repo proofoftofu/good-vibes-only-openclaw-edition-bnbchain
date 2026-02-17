@@ -56,10 +56,11 @@ app.post("/arena/:arenaId/propose", (req, res) => {
 app.post("/arena/:arenaId/commit", async (req, res) => {
   const arenaId = Number(req.params.arenaId);
   const arena = arenaStore.getOrCreate(arenaId);
+  const requestedAltitude = typeof req.body?.altitude === "number" ? req.body.altitude : undefined;
   console.log(`[commit] request received arena=${arenaId} currentVersion=${arena.versionId}`);
 
   try {
-    const action = await dmAgent.runMutationTurn(arena);
+    const action = await dmAgent.runMutationTurn(arena, requestedAltitude);
     console.log(
       `[commit] tx confirmed arena=${arenaId} mutation=${action.payload.mutationType} txHash=${action.txHash}`
     );

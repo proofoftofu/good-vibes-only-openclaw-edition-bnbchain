@@ -3,15 +3,18 @@ import * as THREE from "three";
 
 interface Props {
   versionId: number;
+  baseAltitude: number;
   hazardRate: number;
   enemySpeed: number;
   lootMultiplier: number;
   tiles: [string, string][];
   runNonce: number;
+  onAltitudeChange?: (altitude: number) => void;
 }
 
 type ArenaState = {
   versionId: number;
+  baseAltitude: number;
   hazardRate: number;
   enemySpeed: number;
   lootMultiplier: number;
@@ -55,6 +58,9 @@ type PhysicsConfig = {
   gravity: number;
   collisionPush: number;
   platformDriftScale: number;
+  rotorSpeedScale: number;
+  bumperSpeedScale: number;
+  obstacleSpawnRate: number;
 };
 
 type Hud = {
@@ -70,13 +76,28 @@ type Hud = {
 const PLAYER_RADIUS = 0.45;
 const PLAYER_HEIGHT = 1.8;
 const BASE_RADIUS = 13;
-const PLATFORM_COUNT = 34;
-const START_Y = 1.2;
+const LOOKAHEAD_HEIGHT = 42;
 const FALL_DEATH_Y = -14;
 
-export function GameCanvas({ versionId, hazardRate, enemySpeed, lootMultiplier, tiles, runNonce }: Props) {
+export function GameCanvas({
+  versionId,
+  baseAltitude,
+  hazardRate,
+  enemySpeed,
+  lootMultiplier,
+  tiles,
+  runNonce,
+  onAltitudeChange
+}: Props) {
   const hostRef = useRef<HTMLDivElement | null>(null);
-  const arenaRef = useRef<ArenaState>({ versionId, hazardRate, enemySpeed, lootMultiplier, tiles });
+  const arenaRef = useRef<ArenaState>({
+    versionId,
+    baseAltitude,
+    hazardRate,
+    enemySpeed,
+    lootMultiplier,
+    tiles
+  });
   const runNonceRef = useRef(runNonce);
 
   const [hud, setHud] = useState<Hud>({
@@ -90,8 +111,8 @@ export function GameCanvas({ versionId, hazardRate, enemySpeed, lootMultiplier, 
   });
 
   useEffect(() => {
-    arenaRef.current = { versionId, hazardRate, enemySpeed, lootMultiplier, tiles };
-  }, [versionId, hazardRate, enemySpeed, lootMultiplier, tiles]);
+    arenaRef.current = { versionId, baseAltitude, hazardRate, enemySpeed, lootMultiplier, tiles };
+  }, [versionId, baseAltitude, hazardRate, enemySpeed, lootMultiplier, tiles]);
 
   useEffect(() => {
     runNonceRef.current = runNonce;
@@ -134,13 +155,6 @@ export function GameCanvas({ versionId, hazardRate, enemySpeed, lootMultiplier, 
       puff.position.set((Math.random() - 0.5) * 52, Math.random() * 50, (Math.random() - 0.5) * 52);
       cloudLayer.add(puff);
     }
-
-    const safetyDeck = new THREE.Mesh(
-      new THREE.CylinderGeometry(BASE_RADIUS + 2.5, BASE_RADIUS + 2.5, 0.8, 48),
-      new THREE.MeshStandardMaterial({ color: 0x1f2937, roughness: 0.9 })
-    );
-    safetyDeck.position.y = -6.2;
-    scene.add(safetyDeck);
 
     const player = new THREE.Group();
     const body = new THREE.Mesh(
@@ -193,16 +207,31 @@ export function GameCanvas({ versionId, hazardRate, enemySpeed, lootMultiplier, 
     let dashCooldown = 0;
     let knockbackCooldown = 0;
 
-    let highestPlatformY = START_Y;
+    let highestPlatformY = arenaRef.current.baseAltitude + 1.2;
+    let spawnPoint = new THREE.Vector3(0, highestPlatformY + PLAYER_HEIGHT / 2 + 0.36, 0);
     let currentVersion = arenaRef.current.versionId;
     let seenRunNonce = runNonceRef.current;
 
     let physics: PhysicsConfig = {
       gravity: 28,
       collisionPush: 6,
-      platformDriftScale: 1
+      platformDriftScale: 1,
+      rotorSpeedScale: 1,
+      bumperSpeedScale: 1,
+      obstacleSpawnRate: 0.18
     };
-    let cameraPitch = 0.62;
+    let rngState = 1;
+    const rand = () => {
+      rngState = (rngState * 1664525 + 1013904223) % 4294967296;
+      return rngState / 4294967296;
+    };
+    const reseed = (salt: number) => {
+      rngState = Math.max(1, Math.floor(salt) >>> 0);
+    };
+    let genX = 0;
+    let genY = 0;
+    let genZ = 0;
+    let genAngle = 0;
 
     let lastTick = performance.now();
     let lastHudSync = 0;
@@ -219,9 +248,12 @@ export function GameCanvas({ versionId, hazardRate, enemySpeed, lootMultiplier, 
     const setPhysicsFromChain = () => {
       const s = arenaRef.current;
       physics = {
-        gravity: THREE.MathUtils.clamp(18 + s.lootMultiplier * 9, 18, 42),
-        collisionPush: THREE.MathUtils.clamp(4.5 + s.hazardRate * 0.08, 4.5, 12),
-        platformDriftScale: THREE.MathUtils.clamp(0.65 + s.enemySpeed * 0.35 + s.hazardRate * 0.003, 0.65, 2.2)
+        gravity: THREE.MathUtils.clamp(16 + s.hazardRate * 0.24 + s.enemySpeed * 2.8, 16, 52),
+        collisionPush: THREE.MathUtils.clamp(5 + s.hazardRate * 0.14 + s.enemySpeed * 1.2, 5, 22),
+        platformDriftScale: THREE.MathUtils.clamp(0.7 + s.enemySpeed * 0.95 + s.hazardRate * 0.01, 0.7, 4.5),
+        rotorSpeedScale: THREE.MathUtils.clamp(0.8 + s.enemySpeed * 0.9 + s.hazardRate * 0.008, 0.8, 4.8),
+        bumperSpeedScale: THREE.MathUtils.clamp(0.8 + s.enemySpeed * 0.65 + s.hazardRate * 0.007, 0.8, 4.2),
+        obstacleSpawnRate: THREE.MathUtils.clamp(0.12 + s.hazardRate * 0.004 + s.enemySpeed * 0.035, 0.12, 0.7)
       };
     };
 
@@ -281,69 +313,87 @@ export function GameCanvas({ versionId, hazardRate, enemySpeed, lootMultiplier, 
       bumpers.push({ mesh, center: mesh.position.clone(), radius, speed, phase: Math.random() * Math.PI * 2 });
     };
 
-    const buildMap = () => {
+    const buildInitialMap = () => {
       clearArena();
       setPhysicsFromChain();
 
-      highestPlatformY = START_Y;
-      const seed = currentVersion * 97 + Math.round(arenaRef.current.hazardRate * 13) + Math.round(arenaRef.current.enemySpeed * 29);
-      let s = seed || 1;
-      const rand = () => {
-        s = (s * 1664525 + 1013904223) % 4294967296;
-        return s / 4294967296;
+      const startY = arenaRef.current.baseAltitude + 1.2;
+      highestPlatformY = startY;
+      reseed(
+        currentVersion * 97 +
+          Math.round(arenaRef.current.hazardRate * 13) +
+          Math.round(arenaRef.current.enemySpeed * 29) +
+          Math.round(arenaRef.current.baseAltitude * 11)
+      );
+
+      genX = 0;
+      genY = startY;
+      genZ = 0;
+      genAngle = rand() * Math.PI * 2;
+
+      const start = createPlatform(genX, genY, genZ, 4.3, false);
+      spawnPoint.set(start.mesh.position.x, start.mesh.position.y + start.size.y / 2 + PLAYER_HEIGHT / 2 + 0.05, start.mesh.position.z);
+      player.position.set(spawnPoint.x, spawnPoint.y, spawnPoint.z);
+
+      const ensureGeneratedAhead = (targetY: number) => {
+        let guard = 0;
+        while (highestPlatformY < targetY && guard < 180) {
+          const dist = THREE.MathUtils.lerp(3.8, 6.4, rand()) * THREE.MathUtils.clamp(0.95 + arenaRef.current.enemySpeed * 0.06, 0.9, 1.16);
+          const rise = THREE.MathUtils.lerp(2.2, 3.8, rand()) * THREE.MathUtils.clamp(0.96 + arenaRef.current.lootMultiplier * 0.05, 0.9, 1.15);
+          genAngle += THREE.MathUtils.lerp(-1.05, 1.05, rand());
+
+          genX += Math.cos(genAngle) * dist;
+          genZ += Math.sin(genAngle) * dist;
+          genY += rise;
+
+          const radial = Math.hypot(genX, genZ);
+          if (radial > BASE_RADIUS) {
+            const scale = BASE_RADIUS / radial;
+            genX *= scale;
+            genZ *= scale;
+          }
+
+          const size = THREE.MathUtils.lerp(3.2, 5.1, rand());
+          const driftChance = THREE.MathUtils.clamp(0.2 + arenaRef.current.hazardRate * 0.0025, 0.2, 0.72);
+          const drift = rand() < driftChance;
+          createPlatform(genX, genY, genZ, size, drift);
+
+          if (rand() < 0.2) {
+            const sideA = genAngle + (rand() > 0.5 ? 1 : -1) * THREE.MathUtils.lerp(0.45, 1.15, rand());
+            createPlatform(
+              genX + Math.cos(sideA) * THREE.MathUtils.lerp(2.2, 4.4, rand()),
+              genY + THREE.MathUtils.lerp(-0.35, 0.7, rand()),
+              genZ + Math.sin(sideA) * THREE.MathUtils.lerp(2.2, 4.4, rand()),
+              THREE.MathUtils.lerp(2.4, 3.5, rand()),
+              rand() < driftChance * 0.6
+            );
+          }
+
+          if (rand() < physics.obstacleSpawnRate) {
+            createBumper(
+              genX + (rand() - 0.5) * 3.2,
+              genY + THREE.MathUtils.lerp(0.8, 2.5, rand()),
+              genZ + (rand() - 0.5) * 3.2,
+              THREE.MathUtils.lerp(0.8, 1.5, rand()),
+              THREE.MathUtils.lerp(0.45, 1.1, rand())
+            );
+          }
+
+          if (rand() < physics.obstacleSpawnRate * 0.85) {
+            createRotor(
+              genX + (rand() - 0.5) * 2.2,
+              genY + THREE.MathUtils.lerp(1.2, 2.8, rand()),
+              genZ + (rand() - 0.5) * 2.2,
+              THREE.MathUtils.lerp(7, 12, rand()),
+              THREE.MathUtils.lerp(0.5, 1.25, rand()) * (rand() > 0.5 ? 1 : -1)
+            );
+          }
+
+          guard += 1;
+        }
       };
 
-      let x = 0;
-      let y = START_Y;
-      let z = 0;
-      let angle = rand() * Math.PI * 2;
-
-      const start = createPlatform(x, y, z, 3.7, false);
-      player.position.set(start.mesh.position.x, start.mesh.position.y + start.size.y / 2 + PLAYER_HEIGHT / 2 + 0.05, start.mesh.position.z);
-
-      for (let i = 0; i < PLATFORM_COUNT; i += 1) {
-        const dist = THREE.MathUtils.lerp(2.6, 4.6, rand());
-        const rise = THREE.MathUtils.lerp(1.6, 2.8, rand());
-        angle += THREE.MathUtils.lerp(-1.05, 1.05, rand());
-
-        x += Math.cos(angle) * dist;
-        z += Math.sin(angle) * dist;
-        y += rise;
-
-        const radial = Math.hypot(x, z);
-        if (radial > BASE_RADIUS) {
-          const scale = BASE_RADIUS / radial;
-          x *= scale;
-          z *= scale;
-        }
-
-        const size = THREE.MathUtils.lerp(2.2, 3.2, rand());
-        const drift = rand() < 0.26;
-        createPlatform(x, y, z, size, drift);
-
-        if (rand() < 0.16) {
-          const sideA = angle + (rand() > 0.5 ? 1 : -1) * THREE.MathUtils.lerp(0.45, 1.1, rand());
-          createPlatform(
-            x + Math.cos(sideA) * THREE.MathUtils.lerp(1.9, 3.2, rand()),
-            y + THREE.MathUtils.lerp(-0.4, 0.65, rand()),
-            z + Math.sin(sideA) * THREE.MathUtils.lerp(1.9, 3.2, rand()),
-            THREE.MathUtils.lerp(1.9, 2.4, rand()),
-            rand() < 0.2
-          );
-        }
-      }
-
-      const rotorCount = THREE.MathUtils.clamp(2 + Math.floor(arenaRef.current.enemySpeed), 2, 5);
-      for (let i = 0; i < rotorCount; i += 1) {
-        createRotor(0, THREE.MathUtils.lerp(4, highestPlatformY - 3, i / Math.max(1, rotorCount - 1)), 0, THREE.MathUtils.lerp(8, 12, rand()), THREE.MathUtils.lerp(0.55, 1.1, rand()) * (i % 2 === 0 ? 1 : -1));
-      }
-
-      const bumperCount = THREE.MathUtils.clamp(Math.round(arenaRef.current.hazardRate / 23), 2, 7);
-      for (let i = 0; i < bumperCount; i += 1) {
-        const a = rand() * Math.PI * 2;
-        const r = THREE.MathUtils.lerp(2.2, BASE_RADIUS - 1.6, rand());
-        createBumper(Math.cos(a) * r, THREE.MathUtils.lerp(3, highestPlatformY - 1, rand()), Math.sin(a) * r, THREE.MathUtils.lerp(0.9, 1.8, rand()), THREE.MathUtils.lerp(0.45, 1.0, rand()));
-      }
+      ensureGeneratedAhead(startY + LOOKAHEAD_HEIGHT);
 
       for (const [key, value] of arenaRef.current.tiles.slice(0, 18)) {
         const [gxRaw, gyRaw] = key.split(":");
@@ -353,7 +403,7 @@ export function GameCanvas({ versionId, hazardRate, enemySpeed, lootMultiplier, 
 
         const a = THREE.MathUtils.mapLinear(gx, 0, 19, 0, Math.PI * 2);
         const r = THREE.MathUtils.mapLinear(gy, 0, 19, 2.1, BASE_RADIUS - 1.3);
-        const yPos = THREE.MathUtils.mapLinear((gx + gy) % 10, 0, 9, 4, highestPlatformY - 2);
+        const yPos = THREE.MathUtils.mapLinear((gx + gy) % 10, 0, 9, startY + 4, highestPlatformY - 2);
 
         if (value === "HAZARD") {
           const cone = new THREE.Mesh(
@@ -376,7 +426,64 @@ export function GameCanvas({ versionId, hazardRate, enemySpeed, lootMultiplier, 
         }
       }
 
-      notice = `Mutation v${currentVersion}: map regenerated, keep climbing.`;
+      notice = `Run started at altitude ${Math.round(startY)}.`;
+    };
+
+    const ensureGeneratedAhead = (targetY: number) => {
+      let guard = 0;
+      while (highestPlatformY < targetY && guard < 140) {
+        const dist = THREE.MathUtils.lerp(3.8, 6.4, rand()) * THREE.MathUtils.clamp(0.95 + arenaRef.current.enemySpeed * 0.06, 0.9, 1.16);
+        const rise = THREE.MathUtils.lerp(2.2, 3.8, rand()) * THREE.MathUtils.clamp(0.96 + arenaRef.current.lootMultiplier * 0.05, 0.9, 1.15);
+        genAngle += THREE.MathUtils.lerp(-1.05, 1.05, rand());
+
+        genX += Math.cos(genAngle) * dist;
+        genZ += Math.sin(genAngle) * dist;
+        genY += rise;
+
+        const radial = Math.hypot(genX, genZ);
+        if (radial > BASE_RADIUS) {
+          const scale = BASE_RADIUS / radial;
+          genX *= scale;
+          genZ *= scale;
+        }
+
+        const size = THREE.MathUtils.lerp(3.2, 5.1, rand());
+        const driftChance = THREE.MathUtils.clamp(0.14 + arenaRef.current.hazardRate * 0.0018, 0.14, 0.4);
+        const drift = rand() < driftChance;
+        createPlatform(genX, genY, genZ, size, drift);
+
+        if (rand() < 0.14) {
+          const sideA = genAngle + (rand() > 0.5 ? 1 : -1) * THREE.MathUtils.lerp(0.45, 1.15, rand());
+          createPlatform(
+            genX + Math.cos(sideA) * THREE.MathUtils.lerp(2.2, 4.4, rand()),
+            genY + THREE.MathUtils.lerp(-0.35, 0.7, rand()),
+            genZ + Math.sin(sideA) * THREE.MathUtils.lerp(2.2, 4.4, rand()),
+            THREE.MathUtils.lerp(2.4, 3.5, rand()),
+            rand() < driftChance * 0.6
+          );
+        }
+        if (rand() < THREE.MathUtils.clamp(0.04 + arenaRef.current.hazardRate * 0.001, 0.04, 0.2)) {
+          createBumper(
+            genX + (rand() - 0.5) * 3.2,
+            genY + THREE.MathUtils.lerp(0.8, 2.5, rand()),
+            genZ + (rand() - 0.5) * 3.2,
+            THREE.MathUtils.lerp(0.8, 1.5, rand()),
+            THREE.MathUtils.lerp(0.45, 1.1, rand())
+          );
+        }
+
+        if (rand() < THREE.MathUtils.clamp(0.03 + arenaRef.current.enemySpeed * 0.035, 0.03, 0.2)) {
+          createRotor(
+            genX + (rand() - 0.5) * 2.2,
+            genY + THREE.MathUtils.lerp(1.2, 2.8, rand()),
+            genZ + (rand() - 0.5) * 2.2,
+            THREE.MathUtils.lerp(7, 12, rand()),
+            THREE.MathUtils.lerp(0.5, 1.25, rand()) * (rand() > 0.5 ? 1 : -1)
+          );
+        }
+
+        guard += 1;
+      }
     };
 
     const recoverToNearestPlatform = () => {
@@ -391,7 +498,8 @@ export function GameCanvas({ versionId, hazardRate, enemySpeed, lootMultiplier, 
       }
 
       if (!candidate) {
-        buildMap();
+        player.position.set(spawnPoint.x, spawnPoint.y, spawnPoint.z);
+        vel.set(0, 0, 0);
         return;
       }
 
@@ -420,13 +528,13 @@ export function GameCanvas({ versionId, hazardRate, enemySpeed, lootMultiplier, 
       }
 
       for (const b of bumpers) {
-        b.phase += b.speed * 0.016 * (1 + arenaRef.current.enemySpeed * 0.2);
+        b.phase += b.speed * 0.016 * physics.bumperSpeedScale;
         b.mesh.position.x = b.center.x + Math.cos(b.phase) * b.radius;
         b.mesh.position.z = b.center.z + Math.sin(b.phase) * b.radius;
       }
 
       for (const r of rotors) {
-        r.pivot.rotation.y += r.speed * 0.016 * (1 + arenaRef.current.enemySpeed * 0.2);
+        r.pivot.rotation.y += r.speed * 0.016 * physics.rotorSpeedScale;
       }
 
       for (const c of patchColliders) {
@@ -436,15 +544,6 @@ export function GameCanvas({ versionId, hazardRate, enemySpeed, lootMultiplier, 
 
     const getSupport = (x: number, z: number, footY: number, prevFootY: number): { top: number } | null => {
       let bestTop: number | null = null;
-
-      // Stable base ground as persistent fallback (not moving/rising).
-      const groundTop = safetyDeck.position.y + 0.4;
-      const withinGround = Math.hypot(x, z) <= BASE_RADIUS + 2.3;
-      const groundCrossed = prevFootY >= groundTop - 0.3 && footY <= groundTop + 0.16;
-      const groundStanding = Math.abs(footY - groundTop) <= 0.2;
-      if (withinGround && (groundCrossed || groundStanding)) {
-        bestTop = groundTop;
-      }
 
       for (const p of platforms) {
         const px = p.mesh.position.x;
@@ -471,8 +570,6 @@ export function GameCanvas({ versionId, hazardRate, enemySpeed, lootMultiplier, 
 
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key in keys) keys[e.key] = true;
-      if (e.key === "r" || e.key === "R") cameraPitch = Math.min(1.12, cameraPitch + 0.05);
-      if (e.key === "f" || e.key === "F") cameraPitch = Math.max(0.22, cameraPitch - 0.05);
     };
 
     const onKeyUp = (e: KeyboardEvent) => {
@@ -480,14 +577,10 @@ export function GameCanvas({ versionId, hazardRate, enemySpeed, lootMultiplier, 
     };
 
     const onResize = () => updateRendererSize();
-    const onWheel = (e: WheelEvent) => {
-      cameraPitch = THREE.MathUtils.clamp(cameraPitch + e.deltaY * 0.0009, 0.22, 1.15);
-    };
 
     window.addEventListener("keydown", onKeyDown);
     window.addEventListener("keyup", onKeyUp);
     window.addEventListener("resize", onResize);
-    window.addEventListener("wheel", onWheel, { passive: true });
 
     const applyImpulse = (source: any, label: string) => {
       if (knockbackCooldown > 0) return;
@@ -519,15 +612,15 @@ export function GameCanvas({ versionId, hazardRate, enemySpeed, lootMultiplier, 
       if (jumpPressed) jumpBuffer = 0.14;
 
       if (jumpBuffer > 0 && coyoteTime > 0) {
-        vel.y = 9.3;
+        vel.y = 11.2;
         grounded = false;
         coyoteTime = 0;
         jumpBuffer = 0;
-        jumpHold = 0.15;
+        jumpHold = 0.2;
       }
 
       if (jumpDown && jumpHold > 0) {
-        vel.y += 23 * delta;
+        vel.y += 28 * delta;
         jumpHold -= delta;
       } else {
         jumpHold = 0;
@@ -618,28 +711,29 @@ export function GameCanvas({ versionId, hazardRate, enemySpeed, lootMultiplier, 
       }
     };
 
-    const maybeRegenerateOnMutation = () => {
+    const maybeApplyChainChaos = () => {
       if (arenaRef.current.versionId === currentVersion) return;
       currentVersion = arenaRef.current.versionId;
-
-      buildMap();
-      recoverToNearestPlatform();
-      notice = `On-chain update v${currentVersion}: map regenerated and physics updated.`;
+      setPhysicsFromChain();
+      reseed(
+        rngState ^
+          (currentVersion * 8191 +
+            Math.round(arenaRef.current.hazardRate * 37) +
+            Math.round(arenaRef.current.enemySpeed * 101) +
+            Math.round(arenaRef.current.lootMultiplier * 151))
+      );
+      notice = `On-chain chaos v${currentVersion}: gravity ${physics.gravity.toFixed(1)}, push ${physics.collisionPush.toFixed(1)}.`;
     };
 
     const updateCamera = (delta: number) => {
-      const upBias = Math.max(0, player.position.y * 0.06);
-      const radius = 10.2;
-      const y = Math.sin(cameraPitch) * radius;
-      const z = Math.cos(cameraPitch) * radius;
-      const behind = new THREE.Vector3(0, 3 + y + upBias, z);
+      const behind = new THREE.Vector3(0, 9.5, 8.8);
       const desired = player.position.clone().add(behind);
       camera.position.lerp(desired, Math.min(1, delta * 4.3));
       camera.lookAt(player.position.x, player.position.y + 1.0, player.position.z);
     };
 
     updateRendererSize();
-    buildMap();
+    buildInitialMap();
     // Auto-start when user opens page.
     running = true;
 
@@ -656,7 +750,8 @@ export function GameCanvas({ versionId, hazardRate, enemySpeed, lootMultiplier, 
         notice = "Run recentered. Keep climbing.";
       }
 
-      maybeRegenerateOnMutation();
+      maybeApplyChainChaos();
+      ensureGeneratedAhead(player.position.y + LOOKAHEAD_HEIGHT);
 
       if (running) {
         elapsed += delta;
@@ -675,6 +770,7 @@ export function GameCanvas({ versionId, hazardRate, enemySpeed, lootMultiplier, 
 
       if (now - lastHudSync > 120) {
         lastHudSync = now;
+        onAltitudeChange?.(player.position.y);
         setHud({
           altitude: Math.max(0, player.position.y),
           bestAltitude,
@@ -695,7 +791,6 @@ export function GameCanvas({ versionId, hazardRate, enemySpeed, lootMultiplier, 
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("keyup", onKeyUp);
       window.removeEventListener("resize", onResize);
-      window.removeEventListener("wheel", onWheel);
       clearArena();
       renderer.dispose();
       hostRef.current?.removeChild(renderer.domElement);

@@ -24,7 +24,7 @@ export function ControlPanel(props: Props) {
         <li>Patched Tiles: {props.patchTiles}</li>
       </ul>
       <button onClick={props.onStartRun}>Recenter Run</button>
-      <button onClick={() => void props.onCommit()}>Commit Next Mutation</button>
+      <button onClick={() => void props.onCommit()}>Commit Chaos Update</button>
       <p className="status">{props.status}</p>
       {props.latestTxHash ? (
         <p className="tx-hash">

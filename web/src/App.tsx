@@ -1,11 +1,13 @@
-import { useEffect, useMemo, useState } from "react";
-import { useAccount, useConnect, useDisconnect } from "wagmi";
+import { useEffect, useState } from "react";
 import { fetchArena, commitMutation, openArenaSocket, type ArenaStateResponse } from "./lib/api";
 import { GameCanvas } from "./components/GameCanvas";
 import { ControlPanel } from "./components/ControlPanel";
 
 const arenaId = Number(import.meta.env.VITE_ARENA_ID || 1);
 const agentModeEnabled = import.meta.env.VITE_AGENT_MODE === "1" || import.meta.env.VITE_AGENT_MODE === "true";
+const agentRepoUrl =
+  import.meta.env.VITE_AGENT_REPO_URL ||
+  "https://github.com/proofoftofu/good-vibes-only-openclaw-edition-bnbchain";
 
 const initialArena: ArenaStateResponse = {
   arenaId,
@@ -20,20 +22,10 @@ const initialArena: ArenaStateResponse = {
 
 export default function App() {
   const [arena, setArena] = useState<ArenaStateResponse>(initialArena);
-  const [currentAltitude, setCurrentAltitude] = useState(0);
   const [status, setStatus] = useState("Ready");
   const [latestTxHash, setLatestTxHash] = useState<string>();
-  const [runNonce, setRunNonce] = useState(0);
-  const { address, isConnected } = useAccount();
-  const { connect, connectors } = useConnect();
-  const { disconnect } = useDisconnect();
-
-  const shortAddress = useMemo(() => {
-    if (!address) {
-      return "";
-    }
-    return `${address.slice(0, 6)}...${address.slice(-4)}`;
-  }, [address]);
+  const [runNonce, setRunNonce] = useState(1);
+  const [hasStarted, setHasStarted] = useState(false);
 
   useEffect(() => {
     fetchArena(arenaId)
@@ -61,11 +53,6 @@ export default function App() {
     return () => ws.close();
   }, []);
 
-  useEffect(() => {
-    setRunNonce(1);
-    setStatus(agentModeEnabled ? "Run auto-started. Agent mode is live." : "Run auto-started. Keep climbing.");
-  }, []);
-
   const onCommit = async () => {
     const previousVersion = arena.versionId;
     setStatus("Submitting mutation transaction...");
@@ -86,22 +73,46 @@ export default function App() {
     }
   };
 
+  if (!hasStarted) {
+    return (
+      <main>
+        <section className="landing">
+          <p className="landing-kicker">Up-Only Onchain Chaos</p>
+          <h1>Relic Run: Dungeon Under Rewrite</h1>
+          <p>
+            This is an Up Only style game. The dungeon is managed by an AI agent that reads game state, commits
+            onchain updates, and mutates physics and chaos in real time.
+          </p>
+          <ul>
+            <li>Climb forever with physics-based jumps and collisions.</li>
+            <li>AI game master continuously changes hazard rate, speed, and tile mutations.</li>
+            <li>Every commit is visible and applied through the watcher pipeline.</li>
+          </ul>
+          <div className="landing-actions">
+            <button
+              onClick={() => {
+                setHasStarted(true);
+                setRunNonce((v) => v + 1);
+                setStatus("Run started. Climb as high as possible.");
+              }}
+            >
+              Start Game
+            </button>
+            <a href={agentRepoUrl} target="_blank" rel="noreferrer">
+              Run your own agent (GitHub)
+            </a>
+          </div>
+        </section>
+      </main>
+    );
+  }
+
   return (
     <main>
       <header className="topbar">
         <div>
           <h1>Relic Run: Dungeon Under Rewrite</h1>
           <p>Onchain DM commits mutate a 3D survival arena in real time.</p>
-        </div>
-        <div className="wallet-box">
-          {isConnected ? (
-            <>
-              <span>{shortAddress}</span>
-              <button onClick={() => disconnect()}>Disconnect</button>
-            </>
-          ) : (
-            <button onClick={() => connectors[0] && connect({ connector: connectors[0] })}>Connect Wallet</button>
-          )}
         </div>
       </header>
 
@@ -114,7 +125,6 @@ export default function App() {
           lootMultiplier={arena.lootMultiplier}
           tiles={arena.tiles}
           runNonce={runNonce}
-          onAltitudeChange={setCurrentAltitude}
         />
         <ControlPanel
           arenaId={arena.arenaId}
@@ -125,12 +135,9 @@ export default function App() {
           patchTiles={arena.tiles.length}
           status={status}
           latestTxHash={latestTxHash}
-          onStartRun={() => {
-            setRunNonce((v) => v + 1);
-            setStatus("Run recentered. Keep climbing.");
-          }}
           onCommit={onCommit}
           agentModeEnabled={agentModeEnabled}
+          agentRepoUrl={agentRepoUrl}
         />
       </section>
     </main>

@@ -45,6 +45,7 @@ Implements requested interface:
 
 ### Web client (`web/`)
 - React HUD + Three.js 3D survival arena inspired by elimination party games.
+- Landing page explains the game loop and AI-managed dungeon updates before entering gameplay.
 - Mechanics: complex multi-level map, moving platforms, sweepers, bumpers, falling blocks, jump + dash movement.
 - Physics-first elimination: no HP system; collisions apply knockback and players are eliminated when they fall off-map.
 - Chaos pacing inspired by `chaos-arena-public`:
@@ -57,7 +58,6 @@ Implements requested interface:
   - `SET_ENEMY_SPEED` -> sweeper/bumper motion speed
   - `SET_LOOT_MULTIPLIER` -> survival score scaling
   - `PATCH_TILES` -> extra trap objects/distractions mapped into arena
-- Wallet connection via wagmi/viem.
 - Optional admin action button for manual mutation commit (can be disabled in agent mode).
 - Real-time mutation updates over websocket (tx hash and new versioned state).
 
@@ -131,6 +131,10 @@ Run the bundled OpenClaw loop:
 npm run agent:openclaw
 ```
 
+Recommended when using external LLM loop:
+- set `AGENT_AUTOCOMMIT_ENABLED=false` (avoid competing with server timer loop)
+- keep `VITE_AGENT_MODE=true` (UI is read-only game view + status)
+
 If `AGENT_API_KEY` is set in `.env`, include it as:
 ```bash
 X-Agent-API-Key: <AGENT_API_KEY>
@@ -139,9 +143,9 @@ X-Agent-API-Key: <AGENT_API_KEY>
 ### 6) Demo script
 1. Deploy contracts and set `DUNGEON_COMMIT_ADDRESS`.
 2. Run bootstrap script and set `VITE_ARENA_ID`.
-3. Open web app and connect wallet on BSC testnet.
-4. Click `Start Run`, then move with `WASD/Arrow`, jump with `Space`, dash with `Shift`.
-5. Wait for the agent loop to commit automatically (or click manual commit if agent mode is off).
+3. Open web app, read landing page, and click `Start Game`.
+4. Move with `WASD/Arrow`, jump with `Space`, dash with `Shift`.
+5. Wait for agent commits (server auto mode or external OpenClaw runner).
 6. Observe versioned on-chain mutation changing obstacle speed, danger pressure, and map distractions.
 
 ## Scope Notes (MVP)

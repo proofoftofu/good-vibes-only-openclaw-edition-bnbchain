@@ -7,9 +7,9 @@ interface Props {
   patchTiles: number;
   status: string;
   latestTxHash?: string;
-  onStartRun: () => void;
   onCommit: () => Promise<void>;
   agentModeEnabled?: boolean;
+  agentRepoUrl: string;
 }
 
 export function ControlPanel(props: Props) {
@@ -24,13 +24,18 @@ export function ControlPanel(props: Props) {
         <li>Loot Multiplier: {props.lootMultiplier.toFixed(2)}x</li>
         <li>Patched Tiles: {props.patchTiles}</li>
       </ul>
-      <button onClick={props.onStartRun}>Recenter Run</button>
       {props.agentModeEnabled ? (
         <p className="subtle">Agent mode enabled: chaos commits are automated.</p>
       ) : (
         <button onClick={() => void props.onCommit()}>Commit Chaos Update</button>
       )}
       <p className="status">{props.status}</p>
+      <p className="subtle">
+        Run your own agent:{" "}
+        <a href={props.agentRepoUrl} target="_blank" rel="noreferrer">
+          see GitHub repo details
+        </a>
+      </p>
       {props.latestTxHash ? (
         <p className="tx-hash">
           Latest tx: <code>{props.latestTxHash}</code>

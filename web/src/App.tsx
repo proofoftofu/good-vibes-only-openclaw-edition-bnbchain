@@ -116,7 +116,7 @@ export default function App() {
           latestTxHash={latestTxHash}
           onStartRun={() => {
             setRunNonce((v) => v + 1);
-            setStatus("Run started. Move with arrow keys.");
+            setStatus("Run started. Use WASD/arrows to move, Space to jump, Shift to dash.");
           }}
           onCommit={onCommit}
         />

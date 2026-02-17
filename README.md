@@ -43,8 +43,8 @@ Implements requested interface:
 - `announce_change(arenaId, message)`
 
 ### Web client (`web/`)
-- React HUD + Phaser arena canvas with single-player extraction loop.
-- Mechanics: chase enemies, dynamic hazard spawns, shard collection economy, dash cooldown, extraction gate.
+- React HUD + Three.js 3D platformer arena with single-player extraction loop.
+- Mechanics: jump/platform traversal, moving sentinel hazards, relic collection, dash, extraction goal.
 - On-chain state impact:
   - `SET_HAZARD_RATE` -> hazard pressure and spawn target
   - `SET_ENEMY_SPEED` -> hunter movement speed
@@ -103,7 +103,7 @@ npm run dev --workspace web
 1. Deploy contracts and set `DUNGEON_COMMIT_ADDRESS`.
 2. Run bootstrap script and set `VITE_ARENA_ID`.
 3. Open web app and connect wallet on BSC testnet.
-4. Click `Start Run`, collect shards, avoid hunters/hazards, and extract before collapse.
+4. Click `Start Run`, then move with `WASD/Arrow`, jump with `Space`, dash with `Shift`, and reach the goal.
 5. Click `Commit Next Mutation` during a run.
 6. Observe versioned on-chain mutation visibly changing pressure, speed, loot value, or patched tiles.
 

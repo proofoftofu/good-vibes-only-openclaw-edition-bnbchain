@@ -9,6 +9,7 @@ interface Props {
   latestTxHash?: string;
   onStartRun: () => void;
   onCommit: () => Promise<void>;
+  agentModeEnabled?: boolean;
 }
 
 export function ControlPanel(props: Props) {
@@ -24,7 +25,11 @@ export function ControlPanel(props: Props) {
         <li>Patched Tiles: {props.patchTiles}</li>
       </ul>
       <button onClick={props.onStartRun}>Recenter Run</button>
-      <button onClick={() => void props.onCommit()}>Commit Chaos Update</button>
+      {props.agentModeEnabled ? (
+        <p className="subtle">Agent mode enabled: chaos commits are automated.</p>
+      ) : (
+        <button onClick={() => void props.onCommit()}>Commit Chaos Update</button>
+      )}
       <p className="status">{props.status}</p>
       {props.latestTxHash ? (
         <p className="tx-hash">

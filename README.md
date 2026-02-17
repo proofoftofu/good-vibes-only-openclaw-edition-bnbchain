@@ -21,11 +21,12 @@ This creates a verifiable loop:
 - `ArenaRegistry.sol`
   - create arena linked to agent, swap active agent.
 - `DungeonStateCommit.sol`
-  - commit one of four allowed mutation types:
+  - commit one of allowed mutation types:
     - `SET_HAZARD_RATE`
     - `SET_ENEMY_SPEED`
     - `SET_LOOT_MULTIPLIER`
     - `PATCH_TILES`
+    - `ADVANCE_ALTITUDE`
   - enforces owner-based authorization and monotonic `versionId`.
 
 ### Arena server (`server/`)
@@ -57,7 +58,7 @@ Implements requested interface:
   - `SET_LOOT_MULTIPLIER` -> survival score scaling
   - `PATCH_TILES` -> extra trap objects/distractions mapped into arena
 - Wallet connection via wagmi/viem.
-- Admin action button for committing next DM mutation.
+- Optional admin action button for manual mutation commit (can be disabled in agent mode).
 - Real-time mutation updates over websocket (tx hash and new versioned state).
 
 ## How To Run
@@ -75,6 +76,11 @@ PRIVATE_KEY=0x...
 DUNGEON_COMMIT_ADDRESS=0x...
 VITE_BSC_TESTNET_CHAIN_ID=97
 VITE_ARENA_ID=1
+AGENT_AUTOCOMMIT_ENABLED=true
+AGENT_AUTOCOMMIT_INTERVAL_MS=25000
+AGENT_AUTOCOMMIT_STARTUP_DELAY_MS=7000
+AGENT_AUTOCOMMIT_ARENAS=1
+VITE_AGENT_MODE=true
 ```
 
 ### 3) Deploy contracts to BSC testnet
@@ -105,12 +111,18 @@ npm run dev --workspace web
 - Server: `http://localhost:8787`
 - Web: `http://localhost:5173`
 
+### Agent-based commit mode (OpenClaw style)
+- Set `AGENT_AUTOCOMMIT_ENABLED=true` to let the server AI agent commit mutations automatically.
+- `AGENT_AUTOCOMMIT_INTERVAL_MS` controls commit cadence.
+- `AGENT_AUTOCOMMIT_ARENAS` accepts comma-separated arena IDs.
+- Set `VITE_AGENT_MODE=true` to hide manual commit button in the UI.
+
 ### 6) Demo script
 1. Deploy contracts and set `DUNGEON_COMMIT_ADDRESS`.
 2. Run bootstrap script and set `VITE_ARENA_ID`.
 3. Open web app and connect wallet on BSC testnet.
 4. Click `Start Run`, then move with `WASD/Arrow`, jump with `Space`, dash with `Shift`.
-5. Click `Commit Next Mutation` during a run.
+5. Wait for the agent loop to commit automatically (or click manual commit if agent mode is off).
 6. Observe versioned on-chain mutation changing obstacle speed, danger pressure, and map distractions.
 
 ## Scope Notes (MVP)

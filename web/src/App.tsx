@@ -5,6 +5,7 @@ import { GameCanvas } from "./components/GameCanvas";
 import { ControlPanel } from "./components/ControlPanel";
 
 const arenaId = Number(import.meta.env.VITE_ARENA_ID || 1);
+const agentModeEnabled = import.meta.env.VITE_AGENT_MODE === "1" || import.meta.env.VITE_AGENT_MODE === "true";
 
 const initialArena: ArenaStateResponse = {
   arenaId,
@@ -62,7 +63,7 @@ export default function App() {
 
   useEffect(() => {
     setRunNonce(1);
-    setStatus("Run auto-started. Keep climbing.");
+    setStatus(agentModeEnabled ? "Run auto-started. Agent mode is live." : "Run auto-started. Keep climbing.");
   }, []);
 
   const onCommit = async () => {
@@ -129,6 +130,7 @@ export default function App() {
             setStatus("Run recentered. Keep climbing.");
           }}
           onCommit={onCommit}
+          agentModeEnabled={agentModeEnabled}
         />
       </section>
     </main>

@@ -26,6 +26,10 @@ const dungeonCommitContract = getContract({
 
 const httpServer = createServer(app);
 const wsHub = new WsHub(httpServer);
+const autoCommitArenaIds = env.AGENT_AUTOCOMMIT_ARENAS.split(",")
+  .map((value) => Number(value.trim()))
+  .filter((value) => Number.isInteger(value) && value > 0);
+const autoCommitInFlight = new Set<number>();
 
 app.get("/health", (_req, res) => {
   res.json({ ok: true, time: new Date().toISOString() });
@@ -114,6 +118,60 @@ watchMutations(env.DUNGEON_COMMIT_ADDRESS as Hex, async (event) => {
   }
 });
 
+const runAutoCommitTick = async () => {
+  if (!env.AGENT_AUTOCOMMIT_ENABLED || autoCommitArenaIds.length === 0) return;
+
+  for (const arenaId of autoCommitArenaIds) {
+    if (autoCommitInFlight.has(arenaId)) continue;
+
+    autoCommitInFlight.add(arenaId);
+    try {
+      const arena = arenaStore.getOrCreate(arenaId);
+      console.log(`[agent-loop] committing arena=${arenaId} localVersion=${arena.versionId}`);
+      const action = await dmAgent.runMutationTurn(arena);
+      console.log(
+        `[agent-loop] tx confirmed arena=${arenaId} mutation=${action.payload.mutationType} txHash=${action.txHash}`
+      );
+
+      wsHub.broadcast({
+        type: "announcement",
+        arenaId,
+        message: dmAgent.announce_change(
+          arenaId,
+          `Agent committed ${action.payload.mutationType} (${action.txHash})`
+        )
+      });
+    } catch (error) {
+      console.error(`[agent-loop] commit failed arena=${arenaId}`, error);
+    } finally {
+      autoCommitInFlight.delete(arenaId);
+    }
+  }
+};
+
+const startAutoCommitLoop = () => {
+  if (!env.AGENT_AUTOCOMMIT_ENABLED) {
+    console.log("[agent-loop] disabled");
+    return;
+  }
+  if (autoCommitArenaIds.length === 0) {
+    console.log("[agent-loop] enabled but no valid arena ids configured");
+    return;
+  }
+
+  console.log(
+    `[agent-loop] enabled arenas=${autoCommitArenaIds.join(",")} intervalMs=${env.AGENT_AUTOCOMMIT_INTERVAL_MS} startupDelayMs=${env.AGENT_AUTOCOMMIT_STARTUP_DELAY_MS}`
+  );
+
+  setTimeout(() => {
+    void runAutoCommitTick();
+    setInterval(() => {
+      void runAutoCommitTick();
+    }, env.AGENT_AUTOCOMMIT_INTERVAL_MS);
+  }, env.AGENT_AUTOCOMMIT_STARTUP_DELAY_MS);
+};
+
 httpServer.listen(env.PORT, () => {
   console.log(`arena-server listening on :${env.PORT}`);
+  startAutoCommitLoop();
 });

@@ -117,6 +117,25 @@ npm run dev --workspace web
 - `AGENT_AUTOCOMMIT_ARENAS` accepts comma-separated arena IDs.
 - Set `VITE_AGENT_MODE=true` to hide manual commit button in the UI.
 
+### External LLM agent mode (Chaos Arena style)
+The server exposes a self-documenting skill endpoint and primitive agent commands:
+
+- `GET /skill.md`
+- `GET /arena/:arenaId/agent/context`
+- `POST /arena/:arenaId/agent/command`
+
+This lets OpenClaw (or any LLM runner) poll context, decide mutation, and submit command-driven commits.
+
+Run the bundled OpenClaw loop:
+```bash
+npm run agent:openclaw
+```
+
+If `AGENT_API_KEY` is set in `.env`, include it as:
+```bash
+X-Agent-API-Key: <AGENT_API_KEY>
+```
+
 ### 6) Demo script
 1. Deploy contracts and set `DUNGEON_COMMIT_ADDRESS`.
 2. Run bootstrap script and set `VITE_ARENA_ID`.

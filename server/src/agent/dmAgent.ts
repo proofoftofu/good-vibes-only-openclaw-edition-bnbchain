@@ -10,6 +10,14 @@ export interface ArenaContext {
   avgSurvivalTime: number;
   currentVersion: number;
   cooldownSeconds: number;
+  baseAltitude: number;
+  hazardRate: number;
+  enemySpeed: number;
+  lootMultiplier: number;
+  patchTileCount: number;
+  updatedAt: string;
+  autoCommitEnabled: boolean;
+  allowedMutations: MutationPayload["mutationType"][];
 }
 
 export interface AgentActionResult {
@@ -27,7 +35,21 @@ export class DmAgentService {
       playerCount: 1,
       avgSurvivalTime: 42,
       currentVersion: arena.versionId,
-      cooldownSeconds: 20
+      cooldownSeconds: 20,
+      baseAltitude: arena.baseAltitude,
+      hazardRate: arena.hazardRate,
+      enemySpeed: arena.enemySpeed,
+      lootMultiplier: arena.lootMultiplier,
+      patchTileCount: arena.tiles.size,
+      updatedAt: arena.updatedAt,
+      autoCommitEnabled: true,
+      allowedMutations: [
+        "SET_HAZARD_RATE",
+        "SET_ENEMY_SPEED",
+        "SET_LOOT_MULTIPLIER",
+        "PATCH_TILES",
+        "ADVANCE_ALTITUDE"
+      ]
     };
   }
 

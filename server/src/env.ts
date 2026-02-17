@@ -10,7 +10,8 @@ const envSchema = z.object({
     .transform((value) => value === "1" || value === "true"),
   AGENT_AUTOCOMMIT_INTERVAL_MS: z.coerce.number().int().min(4000).default(25000),
   AGENT_AUTOCOMMIT_STARTUP_DELAY_MS: z.coerce.number().int().min(0).default(7000),
-  AGENT_AUTOCOMMIT_ARENAS: z.string().default("1")
+  AGENT_AUTOCOMMIT_ARENAS: z.string().default("1"),
+  AGENT_API_KEY: z.string().optional()
 });
 
 export const env = envSchema.parse({
@@ -19,5 +20,6 @@ export const env = envSchema.parse({
   AGENT_AUTOCOMMIT_ENABLED: process.env.AGENT_AUTOCOMMIT_ENABLED,
   AGENT_AUTOCOMMIT_INTERVAL_MS: process.env.AGENT_AUTOCOMMIT_INTERVAL_MS,
   AGENT_AUTOCOMMIT_STARTUP_DELAY_MS: process.env.AGENT_AUTOCOMMIT_STARTUP_DELAY_MS,
-  AGENT_AUTOCOMMIT_ARENAS: process.env.AGENT_AUTOCOMMIT_ARENAS
+  AGENT_AUTOCOMMIT_ARENAS: process.env.AGENT_AUTOCOMMIT_ARENAS,
+  AGENT_API_KEY: process.env.AGENT_API_KEY
 });

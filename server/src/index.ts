@@ -1,5 +1,6 @@
 import cors from "cors";
 import express from "express";
+import { readFileSync } from "node:fs";
 import { createServer } from "http";
 import { getContract, type Hex } from "viem";
 import { env } from "./env.js";
@@ -30,13 +31,36 @@ const autoCommitArenaIds = env.AGENT_AUTOCOMMIT_ARENAS.split(",")
   .map((value) => Number(value.trim()))
   .filter((value) => Number.isInteger(value) && value > 0);
 const autoCommitInFlight = new Set<number>();
+const skillDocPath = new URL("../../openclaw/SKILL.md", import.meta.url);
+
+const parseArenaId = (value: string): number | null => {
+  const arenaId = Number(value);
+  return Number.isInteger(arenaId) && arenaId > 0 ? arenaId : null;
+};
+
+const requireAgentApiKey: express.RequestHandler = (req, res, next) => {
+  if (!env.AGENT_API_KEY) {
+    next();
+    return;
+  }
+  const provided = req.header("x-agent-api-key");
+  if (provided !== env.AGENT_API_KEY) {
+    res.status(401).json({ error: "unauthorized-agent" });
+    return;
+  }
+  next();
+};
 
 app.get("/health", (_req, res) => {
   res.json({ ok: true, time: new Date().toISOString() });
 });
 
 app.get("/arena/:arenaId", (req, res) => {
-  const arenaId = Number(req.params.arenaId);
+  const arenaId = parseArenaId(req.params.arenaId);
+  if (!arenaId) {
+    res.status(400).json({ error: "invalid-arena-id" });
+    return;
+  }
   const arena = arenaStore.getOrCreate(arenaId);
 
   res.json({
@@ -46,19 +70,31 @@ app.get("/arena/:arenaId", (req, res) => {
 });
 
 app.get("/arena/:arenaId/context", (req, res) => {
-  const arenaId = Number(req.params.arenaId);
+  const arenaId = parseArenaId(req.params.arenaId);
+  if (!arenaId) {
+    res.status(400).json({ error: "invalid-arena-id" });
+    return;
+  }
   const arena = arenaStore.getOrCreate(arenaId);
   res.json(dmAgent.get_arena_context(arena));
 });
 
 app.post("/arena/:arenaId/propose", (req, res) => {
-  const arenaId = Number(req.params.arenaId);
+  const arenaId = parseArenaId(req.params.arenaId);
+  if (!arenaId) {
+    res.status(400).json({ error: "invalid-arena-id" });
+    return;
+  }
   const arena = arenaStore.getOrCreate(arenaId);
   res.json(dmAgent.propose_mutation(dmAgent.get_arena_context(arena)));
 });
 
 app.post("/arena/:arenaId/commit", async (req, res) => {
-  const arenaId = Number(req.params.arenaId);
+  const arenaId = parseArenaId(req.params.arenaId);
+  if (!arenaId) {
+    res.status(400).json({ error: "invalid-arena-id" });
+    return;
+  }
   const arena = arenaStore.getOrCreate(arenaId);
   const requestedAltitude = typeof req.body?.altitude === "number" ? req.body.altitude : undefined;
   console.log(`[commit] request received arena=${arenaId} currentVersion=${arena.versionId}`);
@@ -78,6 +114,112 @@ app.post("/arena/:arenaId/commit", async (req, res) => {
   } catch (error) {
     console.error(`[commit] failed arena=${arenaId}`, error);
     res.status(500).json({ error: "failed-to-commit-mutation" });
+  }
+});
+
+app.get("/skill.md", (_req, res) => {
+  try {
+    const markdown = readFileSync(skillDocPath, "utf8");
+    res.setHeader("Content-Type", "text/markdown; charset=utf-8");
+    res.status(200).send(markdown);
+  } catch {
+    res.status(404).send("# Skill Not Found\n\nMissing `openclaw/SKILL.md`.");
+  }
+});
+
+app.get("/arena/:arenaId/agent/context", (req, res) => {
+  const arenaId = parseArenaId(req.params.arenaId);
+  if (!arenaId) {
+    res.status(400).json({ error: "invalid-arena-id" });
+    return;
+  }
+  const arena = arenaStore.getOrCreate(arenaId);
+  res.json({
+    context: dmAgent.get_arena_context(arena),
+    state: {
+      ...arena,
+      tiles: [...arena.tiles.entries()]
+    },
+    controls: {
+      autoCommitEnabled: env.AGENT_AUTOCOMMIT_ENABLED,
+      autoCommitIntervalMs: env.AGENT_AUTOCOMMIT_INTERVAL_MS
+    }
+  });
+});
+
+app.post("/arena/:arenaId/agent/command", requireAgentApiKey, async (req, res) => {
+  const arenaId = parseArenaId(req.params.arenaId);
+  if (!arenaId) {
+    res.status(400).json({ error: "invalid-arena-id" });
+    return;
+  }
+  const arena = arenaStore.getOrCreate(arenaId);
+  const command = String(req.body?.command || "");
+
+  try {
+    if (command === "get_context") {
+      res.json({
+        ok: true,
+        result: {
+          context: dmAgent.get_arena_context(arena),
+          state: {
+            ...arena,
+            tiles: [...arena.tiles.entries()]
+          }
+        }
+      });
+      return;
+    }
+
+    if (command === "propose_mutation") {
+      const proposal = dmAgent.propose_mutation(dmAgent.get_arena_context(arena));
+      res.json({ ok: true, result: proposal });
+      return;
+    }
+
+    if (command === "commit_mutation") {
+      const payloadRaw = req.body?.payload;
+      if (!payloadRaw) {
+        res.status(400).json({ ok: false, error: "payload-required" });
+        return;
+      }
+      const payload = mutationPayloadSchema.parse(payloadRaw);
+      const txHash = await dmAgent.commit_mutation(arenaId, payload);
+      wsHub.broadcast({
+        type: "announcement",
+        arenaId,
+        message: dmAgent.announce_change(arenaId, `${payload.mutationType} committed (${txHash})`)
+      });
+      res.json({ ok: true, result: { txHash, payload } });
+      return;
+    }
+
+    if (command === "commit_next") {
+      const action = await dmAgent.runMutationTurn(arena);
+      wsHub.broadcast({
+        type: "announcement",
+        arenaId,
+        message: dmAgent.announce_change(arenaId, `${action.payload.mutationType} committed (${action.txHash})`)
+      });
+      res.json({ ok: true, result: action });
+      return;
+    }
+
+    if (command === "announce") {
+      const message = String(req.body?.message || "").trim();
+      if (!message) {
+        res.status(400).json({ ok: false, error: "message-required" });
+        return;
+      }
+      wsHub.broadcast({ type: "announcement", arenaId, message });
+      res.json({ ok: true, result: { message } });
+      return;
+    }
+
+    res.status(400).json({ ok: false, error: "unsupported-command" });
+  } catch (error) {
+    console.error(`[agent-command] failed arena=${arenaId} command=${command}`, error);
+    res.status(500).json({ ok: false, error: "agent-command-failed" });
   }
 });
 

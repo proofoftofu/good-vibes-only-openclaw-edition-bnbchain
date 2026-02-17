@@ -1,4 +1,19 @@
-# Relic Run: Dungeon Under Rewrite (BSC Testnet)
+# Relic Run: Dungeon Under Rewrite
+
+## Youtube
+https://youtu.be/3yNkiytDdvk
+
+## Live App
+https://good-vibes-only-openclaw-edition-bn.vercel.app
+
+## On-chain Proof
+This transaction represents a live state mutation autonomously decided and executed by the AI Dungeon Master. By committing the DungeonState directly to the BSC Testnet, the agent ensures a verifiable, tamper-proof gameplay loop.
+
+### Tx
+https://testnet.bscscan.com/tx/0x24df90602b03f51ca63f99ab7b94400147e3f14bfa0824426df51876a2279adf
+
+### Contract
+https://testnet.bscscan.com/address/0xcf43a30783a1c8558c0359f90e3ef89ba3ab473b
 
 ## Description
 Relic Run is a browser mini-game where an AI Dungeon Master (DM) mutates arena difficulty and layout in short phases. Every mutation is committed onchain first through `DungeonStateCommit`, then applied by the arena server only when the corresponding committed version is observed.

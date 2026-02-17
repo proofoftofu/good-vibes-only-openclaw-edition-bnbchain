@@ -78,6 +78,7 @@ const PLAYER_HEIGHT = 1.8;
 const BASE_RADIUS = 13;
 const LOOKAHEAD_HEIGHT = 42;
 const FALL_DEATH_Y = -14;
+const START_ALTITUDE = 1.2;
 
 export function GameCanvas({
   versionId,
@@ -207,7 +208,7 @@ export function GameCanvas({
     let dashCooldown = 0;
     let knockbackCooldown = 0;
 
-    let highestPlatformY = arenaRef.current.baseAltitude + 1.2;
+    let highestPlatformY = START_ALTITUDE;
     let spawnPoint = new THREE.Vector3(0, highestPlatformY + PLAYER_HEIGHT / 2 + 0.36, 0);
     let currentVersion = arenaRef.current.versionId;
     let seenRunNonce = runNonceRef.current;
@@ -317,13 +318,12 @@ export function GameCanvas({
       clearArena();
       setPhysicsFromChain();
 
-      const startY = arenaRef.current.baseAltitude + 1.2;
+      const startY = START_ALTITUDE;
       highestPlatformY = startY;
       reseed(
         currentVersion * 97 +
           Math.round(arenaRef.current.hazardRate * 13) +
-          Math.round(arenaRef.current.enemySpeed * 29) +
-          Math.round(arenaRef.current.baseAltitude * 11)
+          Math.round(arenaRef.current.enemySpeed * 29)
       );
 
       genX = 0;

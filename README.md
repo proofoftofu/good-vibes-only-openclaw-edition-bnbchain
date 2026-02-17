@@ -52,7 +52,6 @@ This creates a verifiable loop:
 - Exposes write/agent APIs (`/commit`, `/agent/context`, `/agent/command`) for DM automation.
 
 ### DM Agent service (`server/src/agent/dmAgent.ts`)
-Implements requested interface:
 - `get_arena_context(arenaId)`
 - `propose_mutation(arenaId)`
 - `commit_mutation(arenaId, mutationType, mutationData)`
@@ -131,12 +130,6 @@ npm run dev --workspace web
 - Server: `http://localhost:8787`
 - Web: `http://localhost:5173`
 
-### Agent-based commit mode (OpenClaw style)
-- Set `AGENT_AUTOCOMMIT_ENABLED=true` to let the server AI agent commit mutations automatically.
-- `AGENT_AUTOCOMMIT_INTERVAL_MS` controls commit cadence.
-- `AGENT_AUTOCOMMIT_ARENAS` accepts comma-separated arena IDs.
-- Set `VITE_AGENT_MODE=true` to hide manual commit button in the UI.
-
 ### External LLM agent mode (Chaos Arena style)
 The server exposes a self-documenting skill endpoint and primitive agent commands:
 
@@ -145,31 +138,3 @@ The server exposes a self-documenting skill endpoint and primitive agent command
 - `POST /arena/:arenaId/agent/command`
 
 This lets OpenClaw (or any LLM runner) poll context, decide mutation, and submit command-driven commits.
-
-Run the bundled OpenClaw loop:
-```bash
-npm run agent:openclaw
-```
-
-Recommended when using external LLM loop:
-- set `AGENT_AUTOCOMMIT_ENABLED=false` (avoid competing with server timer loop)
-- keep `VITE_AGENT_MODE=true` (UI is read-only game view + status)
-
-If `AGENT_API_KEY` is set in `.env`, include it as:
-```bash
-X-Agent-API-Key: <AGENT_API_KEY>
-```
-
-### 6) Demo script
-1. Deploy contracts and set `DUNGEON_COMMIT_ADDRESS`.
-2. Run bootstrap script and set `VITE_ARENA_ID`.
-3. Open web app, read landing page, and click `Start Game`.
-4. Move with `WASD/Arrow`, jump with `Space`, dash with `Shift`.
-5. Wait for agent commits (server auto mode or external OpenClaw runner).
-6. Observe versioned on-chain mutation changing obstacle speed, danger pressure, and map distractions.
-
-## Scope Notes (MVP)
-- Single game mode (`Dungeon Sprint`) with one arena template.
-- One mutation commit window per phase.
-- Bounded mutation catalog only (no arbitrary remote code execution).
-- Focused on submission reproducibility and judge-verifiable onchain linkage.
